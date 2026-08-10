@@ -2,6 +2,14 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.4.0 - 2026-08-10
+
+### Eklendi
+
+- Kırk ünitenin her birine “Bu üniteden mutlaka bil” hızlı çalışma alanı.
+- Kritik bilgiler, soru anahtarları, sık kullanılan soru kalıpları ve karıştırılan kavramların tek bölümde gösterilmesi.
+- İki dakikalık tekrar kancası ve varsa doğrudan ünite sorusuna geçiş.
+
 ## v0.3.0 - 2026-08-10
 
 ### Eklendi
