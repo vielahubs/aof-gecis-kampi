@@ -5,6 +5,7 @@ import { Course, Question, Unit, courses, questions } from "./study-data";
 import { examGuides } from "./exam-guides";
 
 type View = "dashboard" | "course" | "quiz" | "mistakes" | "sources";
+type Theme = "light" | "dark";
 type StoredState = {
   completed: string[];
   mistakes: string[];
@@ -30,6 +31,7 @@ export default function Home() {
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [store, setStore] = useState<StoredState>(initialStore);
   const [ready, setReady] = useState(false);
+  const [theme, setTheme] = useState<Theme>("light");
   const [quiz, setQuiz] = useState<Question[]>([]);
   const [quizIndex, setQuizIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
@@ -44,6 +46,9 @@ export default function Home() {
       if (saved) {
         try { setStore(JSON.parse(saved)); } catch { setStore(initialStore); }
       }
+      const savedTheme = window.localStorage.getItem("aof-gecis-kampi-theme");
+      const preferredTheme: Theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      setTheme(savedTheme === "dark" || savedTheme === "light" ? savedTheme : preferredTheme);
       setReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -52,6 +57,11 @@ export default function Home() {
   useEffect(() => {
     if (ready) window.localStorage.setItem("aof-gecis-kampi-v1", JSON.stringify(store));
   }, [store, ready]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    if (ready) window.localStorage.setItem("aof-gecis-kampi-theme", theme);
+  }, [theme, ready]);
 
   const totalUnits = courses.reduce((sum, course) => sum + course.units.length, 0);
   const completion = Math.round((store.completed.length / totalUnits) * 100);
@@ -157,7 +167,7 @@ export default function Home() {
       <section className="content">
         <header className="topbar">
           <div><span className="status-dot" /> Veriler bu cihazda saklanıyor</div>
-          <div className="top-actions"><span className="date-pill">22 AĞU</span><button onClick={() => startQuiz()}>Hızlı deneme</button></div>
+          <div className="top-actions"><button className="theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "Açık temaya geç" : "Karanlık temaya geç"}>{theme === "dark" ? "☀ Açık" : "☾ Koyu"}</button><span className="date-pill">22 AĞU</span><button onClick={() => startQuiz()}>Hızlı deneme</button></div>
         </header>
 
         {view === "dashboard" && (
