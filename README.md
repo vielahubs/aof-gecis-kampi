@@ -2,7 +2,7 @@
 
 22 Ağustos 2026 AÖF yaz okulu sınavları için hazırlanmış, tarayıcıda çalışan çalışma takip uygulaması.
 
-Güncel sürüm: **v1.1.0** · [Değişiklik günlüğü](CHANGELOG.md)
+Güncel sürüm: **v0.2.0** · [Değişiklik günlüğü](CHANGELOG.md)
 
 ## Özellikler
 
