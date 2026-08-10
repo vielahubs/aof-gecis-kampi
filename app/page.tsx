@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Course, Question, Unit, courses, questions } from "./study-data";
 import { examGuides } from "./exam-guides";
+import { historyDeepDives } from "./history-deep-dives";
 
 type View = "dashboard" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
@@ -365,6 +366,7 @@ export default function Home() {
 function UnitStudy({ course, unit, completed, onToggle, onQuiz, onCourseQuiz }: { course: Course; unit: Unit; completed: boolean; onToggle: () => void; onQuiz: (unitNumber: number) => void; onCourseQuiz: () => void }) {
   const unitNumber = course.units.indexOf(unit) + 1;
   const guide = examGuides[unit.id];
+  const deepDive = historyDeepDives[unit.id];
   const unitQuestionCount = questions.filter((question) => question.course === course.code && question.unit === unitNumber).length;
   return <div className="study-layout">
     <article className="study-main">
@@ -380,7 +382,7 @@ function UnitStudy({ course, unit, completed, onToggle, onQuiz, onCourseQuiz }: 
         <div className="unit-check-action"><div><strong>Kendini kontrol et</strong><small>{unitQuestionCount ? `Bu ünite için ${unitQuestionCount} özgün kontrol sorusu hazır.` : "Bu üniteye özel soru henüz yok; ders denemesinden devam edebilirsin."}</small></div><button className="primary" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Ünite sorusunu çöz" : "Ders denemesini aç"} →</button></div>
       </section>
       <div className="exam-evidence"><span>ÇIKMIŞ SORU ANALİZİ</span><strong>3 yaz okulu • 60 soru / ders</strong><p>Bu ünitenin anlatımı, sorularda görülen kavram ve çeldirici kalıplarına göre genişletildi.</p></div>
-      <section className="lesson-copy"><h2>Konuyu anlayarak öğren</h2>{guide.lesson.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</section>
+      <section className="lesson-copy"><h2>Konuyu anlayarak öğren</h2>{guide.lesson.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}{deepDive && <div className="deep-dive-sections">{deepDive.map((section, index) => <section key={section.title}><span>{String(index + 1).padStart(2, "0")}</span><div><h3>{section.title}</h3><p>{section.body}</p></div></section>)}</div>}</section>
       <section><h2>Kavram kartları</h2><div className="flash-grid">{unit.keywords.map((keyword) => <div key={keyword}><span>KAVRAM</span><strong>{keyword}</strong><small>Kendi cümlenle açıklamayı dene.</small></div>)}</div></section>
       <div className="source-note"><strong>10 Ağustos 2026 tarihinde doğrulandı</strong><p>{course.verification} Soru eğilimleri {course.archivePeriods} dönemlerinden çıkarıldı. Açık arşiv resmî değildir; kesin metin ve cevap anahtarı için eKampüs esas alınır.</p><div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}<a href={course.archiveSource} target="_blank" rel="noreferrer">İncelenen soru arşivi ↗</a></div></div>
     </article>
