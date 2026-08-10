@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Course, Question, Unit, courses, questions } from "./study-data";
+import { examGuides } from "./exam-guides";
 
 type View = "dashboard" | "course" | "quiz" | "mistakes" | "sources";
 type StoredState = {
@@ -165,7 +166,7 @@ export default function Home() {
               <div>
                 <p className="eyebrow">YAZ OKULU • 5 DERS • 40 ÜNİTE</p>
                 <h1>Geçmek için ne çalışacağını<br />her gün netleştir.</h1>
-                <p>Bütün üniteler kapsamda. Başlıklar 10 Ağustos 2026 tarihinde resmî Anadolu kaynaklarıyla yeniden denetlendi; özet ve sorular özgün çalışma içeriğidir.</p>
+                <p>Bütün üniteler kapsamda. 300 yaz okulu sorusu tarandı; tekrar eden kavramlar konu anlatımlarına ve sınav tuzaklarına dönüştürüldü.</p>
                 <div className="hero-actions"><button className="primary" onClick={() => todaysUnits[0] && openCourse(todaysUnits[0].course)}>Bugünün planına başla <span>→</span></button><button className="ghost" onClick={() => startQuiz()}>Seviye denemesi</button><button className="ghost" onClick={() => setView("sources")}>Kaynakları gör</button></div>
               </div>
               <div className="countdown-card">
@@ -191,7 +192,7 @@ export default function Home() {
                   {todaysUnits.length ? todaysUnits.map(({ course, unit }, index) => (
                     <button key={unit.id} onClick={() => { openCourse(course); setSelectedUnit(unit); }}>
                       <span className="task-index">{String(index + 1).padStart(2, "0")}</span>
-                      <span className="task-copy"><small style={{ color: course.color }}>{course.code}</small><strong>Ünite {course.units.indexOf(unit) + 1} · {unit.title}</strong><em>Özet + kritik noktalar + soru</em></span>
+                      <span className="task-copy"><small style={{ color: course.color }}>{course.code}</small><strong>Ünite {course.units.indexOf(unit) + 1} · {unit.title}</strong><em>Konu anlatımı + soru sinyalleri + hafıza kancası</em></span>
                       <span className="task-arrow">→</span>
                     </button>
                   )) : <div className="empty-state"><strong>Tüm üniteler tamam!</strong><p>Şimdi karışık denemelerle bilgini sağlamlaştır.</p></div>}
@@ -225,7 +226,7 @@ export default function Home() {
                     const done = store.completed.includes(unit.id);
                     return <article key={unit.id} className={done ? "done" : ""} onClick={() => setSelectedUnit(unit)}>
                       <div className="unit-top"><span style={{ color: selectedCourse.color }}>ÜNİTE {String(index + 1).padStart(2, "0")}</span><button onClick={(event) => { event.stopPropagation(); toggleUnit(unit.id); }} aria-label={done ? "Tamamlanmadı işaretle" : "Tamamlandı işaretle"}>{done ? "✓" : ""}</button></div>
-                      <h2>{unit.title}</h2><p>{unit.summary}</p><div className="tag-row">{unit.keywords.slice(0, 3).map((keyword) => <span key={keyword}>{keyword}</span>)}</div><em>Çalışmaya aç →</em>
+                      <h2>{unit.title}</h2><p>{unit.summary}</p><div className="tag-row">{examGuides[unit.id].signals.slice(0, 3).map((keyword) => <span key={keyword}>{keyword}</span>)}</div><em>Çıkmış soru odaklı anlatımı aç →</em>
                     </article>;
                   })}
                 </div>
@@ -247,7 +248,14 @@ export default function Home() {
           <div className="page sources-page">
             <p className="eyebrow">SON DENETİM • 10 AĞUSTOS 2026</p>
             <h1>Kaynak ve doğrulama kaydı</h1>
-            <p className="lead">Buradaki ayrım önemli: ünite adları ve sınav kapsamı resmî Anadolu kaynaklarından; kısa özetler, kavram kartları ve {questions.length} soru ise çalışma amacıyla özgün hazırlanmıştır. Sorular “çıkmış sınav sorusu” değildir.</p>
+            <p className="lead">Buradaki ayrım önemli: ünite adları ve sınav kapsamı resmî Anadolu kaynaklarından doğrulandı. Konu öncelikleri, kamuya açık arşivdeki 300 yaz okulu sorusunun taranmasıyla çıkarıldı. Uygulamadaki {questions.length} deneme sorusu ise özgün hazırlanmıştır.</p>
+
+            <section className="corpus-panel">
+              <div><span>300</span><p>görsel soru<br />indirildi</p></div>
+              <div><span>290</span><p>soru OCR ile<br />okunabildi</p></div>
+              <div><span>15</span><p>ders–dönem<br />seti incelendi</p></div>
+              <div><span>5</span><p>ders için<br />odak haritası</p></div>
+            </section>
 
             <section className="scope-alert">
               <span>RESMÎ YAZ OKULU KURALI</span>
@@ -260,7 +268,8 @@ export default function Home() {
               {courses.map((course) => <article key={course.code}>
                 <div className="verified-title"><i style={{ background: course.color }}>✓</i><div><small>{course.code}</small><h2>{course.title}</h2></div></div>
                 <p>{course.verification}</p>
-                <div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}</div>
+                <p className="archive-period"><strong>Soru örneklemi:</strong> {course.archivePeriods}; toplam 60 soru.</p>
+                <div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}<a href={course.archiveSource} target="_blank" rel="noreferrer">İncelenen açık arşiv ↗</a></div>
               </article>)}
             </div>
 
@@ -270,7 +279,9 @@ export default function Home() {
                 <li><span>1</span><p>Ders kodu ve adı, Anadolu Üniversitesi akademik ders sayfasıyla eşleştirildi.</p></li>
                 <li><span>2</span><p>Sekiz ünite başlığı, resmî ders içeriği ve varsa Anadolu Kitap Satış sayfasındaki içindekilerle çapraz kontrol edildi.</p></li>
                 <li><span>3</span><p>Yaz okulu kapsamı, 2025–2026 resmî kayıt kılavuzunun “Sınavda ilgili derse ait ünitelerin tamamından sorumludur” hükmüyle doğrulandı.</p></li>
-                <li><span>4</span><p>Uygulamadaki soruların ünite etiketleri yeni başlıklarla yeniden eşleştirildi; resmî soru iddiası kaldırıldı.</p></li>
+                <li><span>4</span><p>Beş ders için üçer yaz okulu sınavındaki 300 soru görseli indirildi; 290 soru OCR ile okunup örneklem bütünlüğü kontrol edildi.</p></li>
+                <li><span>5</span><p>Aynı kavramın farklı yazımları tek başlıkta birleştirildi; tekrar eden soru kalıpları, karıştırılan seçenekler ve anahtar kelimeler ünitelere eşlendi.</p></li>
+                <li><span>6</span><p>Açık arşiv Anadolu Üniversitesi'nin resmî sistemi değildir. Kesin soru metni ve cevap anahtarı için eKampüs esas alınmalıdır; burada soru metinleri kopyalanmadan analiz sonucu kullanılır.</p></li>
               </ol>
               <div className="official-links"><a href="https://www.anadolu.edu.tr/acikogretim/ogrenme-ortamlari/kitap-hizmetleri" target="_blank" rel="noreferrer">Güncel PDF’nin esas olduğunu açıklayan Kitap Hizmetleri ↗</a><a href="https://www.anadolu.edu.tr/acikogretim/sinavlar-ve-sorumluluk-uniteleri/sinav-tarihleri" target="_blank" rel="noreferrer">22 Ağustos sınav tarihi ↗</a><a href="https://www.anadolu.edu.tr/acikogretim/sinavlar-ve-sorumluluk-uniteleri/sinavyayinlamasistemi" target="_blank" rel="noreferrer">Resmî çıkmış sorular: eKampüs ↗</a></div>
             </section>
@@ -304,12 +315,18 @@ export default function Home() {
 
 function UnitStudy({ course, unit, completed, onToggle, onQuiz }: { course: Course; unit: Unit; completed: boolean; onToggle: () => void; onQuiz: () => void }) {
   const unitNumber = course.units.indexOf(unit) + 1;
+  const guide = examGuides[unit.id];
   return <div className="study-layout">
     <article className="study-main">
       <p className="eyebrow" style={{ color: course.color }}>{course.code} • ÜNİTE {unitNumber}</p><h1>{unit.title}</h1><p className="study-summary">{unit.summary}</p>
-      <section><h2>Sınav için kritik noktalar</h2><ol>{unit.keyPoints.map((point, index) => <li key={point}><span>{index + 1}</span><p>{point}</p></li>)}</ol></section>
+      <div className="exam-evidence"><span>ÇIKMIŞ SORU ANALİZİ</span><strong>3 yaz okulu • 60 soru / ders</strong><p>Bu ünitenin anlatımı, sorularda görülen kavram ve çeldirici kalıplarına göre genişletildi.</p></div>
+      <section className="lesson-copy"><h2>Konuyu anlayarak öğren</h2>{guide.lesson.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</section>
+      <section><h2>Soruda görünce uyan</h2><div className="signal-grid">{guide.signals.map((signal) => <span key={signal}>{signal}</span>)}</div></section>
+      <section><h2>Soru nasıl geliyor?</h2><ol>{guide.patterns.map((pattern, index) => <li key={pattern}><span>{index + 1}</span><p>{pattern}</p></li>)}</ol></section>
+      <div className="trap-grid"><div><span>EN SIK KARIŞAN</span><p>{guide.trap}</p></div><div><span>HAFIZA KANCASI</span><p>{guide.hook}</p></div></div>
+      <section><h2>Kitap kapsamından hızlı doğrulama</h2><ol>{unit.keyPoints.map((point, index) => <li key={point}><span>{index + 1}</span><p>{point}</p></li>)}</ol></section>
       <section><h2>Kavram kartları</h2><div className="flash-grid">{unit.keywords.map((keyword) => <div key={keyword}><span>KAVRAM</span><strong>{keyword}</strong><small>Kendi cümlenle açıklamayı dene.</small></div>)}</div></section>
-      <div className="source-note"><strong>10 Ağustos 2026 tarihinde doğrulandı</strong><p>{course.verification} Bu sayfadaki özet ve sorular çalışma amaçlı özgün anlatımlardır; resmî çıkmış soru değildir.</p><div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}</div></div>
+      <div className="source-note"><strong>10 Ağustos 2026 tarihinde doğrulandı</strong><p>{course.verification} Soru eğilimleri {course.archivePeriods} dönemlerinden çıkarıldı. Açık arşiv resmî değildir; kesin metin ve cevap anahtarı için eKampüs esas alınır.</p><div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}<a href={course.archiveSource} target="_blank" rel="noreferrer">İncelenen soru arşivi ↗</a></div></div>
     </article>
     <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className="ghost" onClick={onQuiz}>Bu dersten soru çöz</button><small>İpucu: Özeti kapatıp üç kritik noktayı sesli anlatabiliyorsan üniteyi tamamla.</small></aside>
   </div>;
