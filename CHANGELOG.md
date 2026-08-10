@@ -2,6 +2,14 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.3.0 - 2026-08-10
+
+### Eklendi
+
+- Genel Bakış'tan ayrı, beş dersin 40 ünitesini birlikte gösteren İlerleme Haritası.
+- Harita üzerinden üniteye doğrudan geçme ve tamamlanma durumunu değiştirme.
+- Ders ve genel toplam için görsel ilerleme göstergeleri.
+
 ## v0.2.0 - 2026-08-10
 
 ### Eklendi
