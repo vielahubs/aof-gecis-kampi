@@ -2,7 +2,7 @@
 
 22 Ağustos 2026 AÖF yaz okulu sınavları için hazırlanmış, tarayıcıda çalışan çalışma takip uygulaması.
 
-Güncel sürüm: **v0.4.0** · [Değişiklik günlüğü](CHANGELOG.md)
+Güncel sürüm: **v0.5.0** · [Değişiklik günlüğü](CHANGELOG.md)
 
 ## Özellikler
 
@@ -11,6 +11,7 @@ Güncel sürüm: **v0.4.0** · [Değişiklik günlüğü](CHANGELOG.md)
 - Yanlış soruları otomatik tekrar listesine ekleme
 - Beş dersin 40 ünitesini gösteren ayrı ilerleme haritası
 - Her ünitenin başında sınavlık “Bu üniteden mutlaka bil” özeti
+- İnkılap Tarihi I'in sekiz ünitesi için ayrıntılı sınav anlatımları
 - Açık ve karanlık görünüm seçeneği
 - Resmî Anadolu Üniversitesi kaynak bağlantıları
 - İlerlemeyi yalnızca kullanıcının tarayıcısında saklama
