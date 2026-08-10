@@ -1,0 +1,27 @@
+# Değişiklik Günlüğü
+
+Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
+
+## v1.1.0 - 2026-08-10
+
+### Eklendi
+
+- Üst menüden değiştirilebilen açık ve karanlık görünüm.
+- Tema tercihinin tarayıcıda saklanması.
+- İlk açılışta cihazın görünüm tercihinin algılanması.
+- Çıkmış soru eğilimlerinden yararlanan anahtar kelime odaklı konu anlatımları.
+
+### İyileştirildi
+
+- Karanlık görünümde kartlar, sorular, doğru-yanlış geri bildirimleri ve kaynak alanlarının okunabilirliği.
+
+## v1.0.0 - 2026-08-10
+
+### Eklendi
+
+- Beş ders ve toplam 40 ünite için çalışma takibi.
+- Ders bazında ve karışık özgün denemeler.
+- Yanlış soruları otomatik tekrar listesine ekleme.
+- İlerlemenin tarayıcıda saklanması.
+- Resmî Anadolu Üniversitesi kaynak bağlantıları.
+- GitHub Pages üzerinden otomatik yayınlama.
