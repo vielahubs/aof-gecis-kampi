@@ -1,0 +1,316 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Course, Question, Unit, courses, questions } from "./study-data";
+
+type View = "dashboard" | "course" | "quiz" | "mistakes" | "sources";
+type StoredState = {
+  completed: string[];
+  mistakes: string[];
+  answered: number;
+  correct: number;
+};
+
+const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0 };
+
+function daysToExam() {
+  const now = new Date();
+  const exam = new Date("2026-08-22T09:30:00+03:00");
+  return Math.max(0, Math.ceil((exam.getTime() - now.getTime()) / 86_400_000));
+}
+
+function shuffle<T>(items: T[]) {
+  return [...items].sort(() => Math.random() - 0.5);
+}
+
+export default function Home() {
+  const [view, setView] = useState<View>("dashboard");
+  const [selectedCourse, setSelectedCourse] = useState<Course>(courses[0]);
+  const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
+  const [store, setStore] = useState<StoredState>(initialStore);
+  const [ready, setReady] = useState(false);
+  const [quiz, setQuiz] = useState<Question[]>([]);
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [quizCorrect, setQuizCorrect] = useState(0);
+  const [quizWrong, setQuizWrong] = useState(0);
+  const [quizBlank, setQuizBlank] = useState(0);
+  const [showResult, setShowResult] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const saved = window.localStorage.getItem("aof-gecis-kampi-v1");
+      if (saved) {
+        try { setStore(JSON.parse(saved)); } catch { setStore(initialStore); }
+      }
+      setReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (ready) window.localStorage.setItem("aof-gecis-kampi-v1", JSON.stringify(store));
+  }, [store, ready]);
+
+  const totalUnits = courses.reduce((sum, course) => sum + course.units.length, 0);
+  const completion = Math.round((store.completed.length / totalUnits) * 100);
+  const accuracy = store.answered ? Math.round((store.correct / store.answered) * 100) : 0;
+
+  const todaysUnits = useMemo(() => {
+    const unfinished = courses.flatMap((course) => course.units.map((unit) => ({ course, unit })))
+      .filter(({ unit }) => !store.completed.includes(unit.id));
+    return unfinished.slice(0, 5);
+  }, [store.completed]);
+
+  function openCourse(course: Course) {
+    setSelectedCourse(course);
+    setSelectedUnit(null);
+    setView("course");
+  }
+
+  function toggleUnit(id: string) {
+    setStore((prev) => ({
+      ...prev,
+      completed: prev.completed.includes(id) ? prev.completed.filter((item) => item !== id) : [...prev.completed, id],
+    }));
+  }
+
+  function startQuiz(courseCode?: string, mistakeOnly = false) {
+    let pool = questions;
+    if (mistakeOnly) pool = questions.filter((question) => store.mistakes.includes(question.id));
+    else if (courseCode) pool = questions.filter((question) => question.course === courseCode);
+    const next = shuffle(pool).slice(0, Math.min(10, pool.length));
+    if (!next.length) return;
+    setQuiz(next);
+    setQuizIndex(0);
+    setPicked(null);
+    setQuizCorrect(0);
+    setQuizWrong(0);
+    setQuizBlank(0);
+    setShowResult(false);
+    setView("quiz");
+  }
+
+  function answerQuestion(option: number) {
+    if (picked !== null) return;
+    const current = quiz[quizIndex];
+    const correct = option === current.answer;
+    setPicked(option);
+    setQuizCorrect((value) => value + (correct ? 1 : 0));
+    setQuizWrong((value) => value + (correct ? 0 : 1));
+    setStore((prev) => ({
+      ...prev,
+      answered: prev.answered + 1,
+      correct: prev.correct + (correct ? 1 : 0),
+      mistakes: correct ? prev.mistakes.filter((id) => id !== current.id) : Array.from(new Set([...prev.mistakes, current.id])),
+    }));
+  }
+
+  function nextQuestion(blank = false) {
+    if (blank && picked === null) setQuizBlank((value) => value + 1);
+    if (quizIndex === quiz.length - 1) setShowResult(true);
+    else {
+      setQuizIndex((value) => value + 1);
+      setPicked(null);
+    }
+  }
+
+  const currentQuestion = quiz[quizIndex];
+  const net = quizCorrect - quizWrong / 4;
+  const estimated = quiz.length ? Math.max(0, Math.round((net / quiz.length) * 100)) : 0;
+
+  return (
+    <main className="app-shell">
+      <aside className="sidebar">
+        <button className="brand" onClick={() => setView("dashboard")} aria-label="Ana sayfa">
+          <span className="brand-mark">A</span>
+          <span><strong>AÖF Kampı</strong><small>22 Ağustos 2026</small></span>
+        </button>
+
+        <nav className="main-nav" aria-label="Ana menü">
+          <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><span>⌂</span> Genel Bakış</button>
+          <button className={view === "mistakes" ? "active" : ""} onClick={() => setView("mistakes")}><span>↺</span> Yanlışlarım <em>{store.mistakes.length}</em></button>
+          <button onClick={() => startQuiz()}><span>▶</span> Karışık Deneme</button>
+          <button className={view === "sources" ? "active" : ""} onClick={() => setView("sources")}><span>✓</span> Kaynak Kontrolü</button>
+        </nav>
+
+        <p className="nav-label">Dersler</p>
+        <nav className="course-nav" aria-label="Dersler">
+          {courses.map((course) => {
+            const done = course.units.filter((unit) => store.completed.includes(unit.id)).length;
+            return (
+              <button key={course.code} onClick={() => openCourse(course)} className={view === "course" && selectedCourse.code === course.code ? "active" : ""}>
+                <span className="course-dot" style={{ background: course.color }} />
+                <span><strong>{course.short}</strong><small>{done}/8 ünite</small></span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-note">
+          <span>Resmî kapsam: 1–8</span>
+          <p>2025–2026 yaz okulu kılavuzuna göre her dersin bütün üniteleri sınav kapsamında.</p>
+        </div>
+      </aside>
+
+      <section className="content">
+        <header className="topbar">
+          <div><span className="status-dot" /> Veriler bu cihazda saklanıyor</div>
+          <div className="top-actions"><span className="date-pill">22 AĞU</span><button onClick={() => startQuiz()}>Hızlı deneme</button></div>
+        </header>
+
+        {view === "dashboard" && (
+          <div className="page dashboard">
+            <section className="hero-panel">
+              <div>
+                <p className="eyebrow">YAZ OKULU • 5 DERS • 40 ÜNİTE</p>
+                <h1>Geçmek için ne çalışacağını<br />her gün netleştir.</h1>
+                <p>Bütün üniteler kapsamda. Başlıklar 10 Ağustos 2026 tarihinde resmî Anadolu kaynaklarıyla yeniden denetlendi; özet ve sorular özgün çalışma içeriğidir.</p>
+                <div className="hero-actions"><button className="primary" onClick={() => todaysUnits[0] && openCourse(todaysUnits[0].course)}>Bugünün planına başla <span>→</span></button><button className="ghost" onClick={() => startQuiz()}>Seviye denemesi</button><button className="ghost" onClick={() => setView("sources")}>Kaynakları gör</button></div>
+              </div>
+              <div className="countdown-card">
+                <span>Sınava kalan</span>
+                <strong>{daysToExam()}</strong>
+                <b>GÜN</b>
+                <div className="mini-progress"><i style={{ width: `${Math.min(100, completion)}%` }} /></div>
+                <small>{store.completed.length} / {totalUnits} ünite tamamlandı</small>
+              </div>
+            </section>
+
+            <section className="stat-grid">
+              <article><span>Genel ilerleme</span><strong>%{completion}</strong><small>40 ünitenin {store.completed.length} tanesi tamam</small></article>
+              <article><span>Soru doğruluğu</span><strong>%{accuracy}</strong><small>{store.answered || 0} cevap üzerinden</small></article>
+              <article><span>Tekrar bekleyen</span><strong>{store.mistakes.length}</strong><small>yanlış soru</small></article>
+              <article><span>Günlük hedef</span><strong>5</strong><small>ünite / yaklaşık 2,5 saat</small></article>
+            </section>
+
+            <div className="dashboard-grid">
+              <section className="panel today-panel">
+                <div className="panel-heading"><div><p className="eyebrow">BUGÜN</p><h2>Çalışma rotan</h2></div><span>{todaysUnits.length} görev</span></div>
+                <div className="task-list">
+                  {todaysUnits.length ? todaysUnits.map(({ course, unit }, index) => (
+                    <button key={unit.id} onClick={() => { openCourse(course); setSelectedUnit(unit); }}>
+                      <span className="task-index">{String(index + 1).padStart(2, "0")}</span>
+                      <span className="task-copy"><small style={{ color: course.color }}>{course.code}</small><strong>Ünite {course.units.indexOf(unit) + 1} · {unit.title}</strong><em>Özet + kritik noktalar + soru</em></span>
+                      <span className="task-arrow">→</span>
+                    </button>
+                  )) : <div className="empty-state"><strong>Tüm üniteler tamam!</strong><p>Şimdi karışık denemelerle bilgini sağlamlaştır.</p></div>}
+                </div>
+              </section>
+
+              <section className="panel courses-panel">
+                <div className="panel-heading"><div><p className="eyebrow">DERSLER</p><h2>İlerleme haritası</h2></div></div>
+                <div className="course-cards">
+                  {courses.map((course) => {
+                    const done = course.units.filter((unit) => store.completed.includes(unit.id)).length;
+                    return <button key={course.code} onClick={() => openCourse(course)}><span className="course-icon" style={{ background: `${course.color}1c`, color: course.color }}>{course.short.slice(0, 2).toUpperCase()}</span><span><small>{course.code}</small><strong>{course.title}</strong><i><b style={{ width: `${done * 12.5}%`, background: course.color }} /></i></span><em>{done}/8</em></button>;
+                  })}
+                </div>
+              </section>
+            </div>
+          </div>
+        )}
+
+        {view === "course" && (
+          <div className="page course-page">
+            <button className="back-link" onClick={() => { if (selectedUnit) setSelectedUnit(null); else setView("dashboard"); }}>← {selectedUnit ? "Ünitelere dön" : "Genel bakış"}</button>
+            {!selectedUnit ? (
+              <>
+                <section className="course-header" style={{ "--course-color": selectedCourse.color } as React.CSSProperties}>
+                  <div><p className="eyebrow">{selectedCourse.code} • 8 ÜNİTE</p><h1>{selectedCourse.title}</h1><p>Tüm üniteleri sırayla tamamla. Son dört üniteyi ihmal etme; ancak yaz okulunda bütün üniteler kapsamda.</p></div>
+                  <button className="primary" onClick={() => startQuiz(selectedCourse.code)}>Ders denemesi <span>→</span></button>
+                </section>
+                <div className="unit-grid">
+                  {selectedCourse.units.map((unit, index) => {
+                    const done = store.completed.includes(unit.id);
+                    return <article key={unit.id} className={done ? "done" : ""} onClick={() => setSelectedUnit(unit)}>
+                      <div className="unit-top"><span style={{ color: selectedCourse.color }}>ÜNİTE {String(index + 1).padStart(2, "0")}</span><button onClick={(event) => { event.stopPropagation(); toggleUnit(unit.id); }} aria-label={done ? "Tamamlanmadı işaretle" : "Tamamlandı işaretle"}>{done ? "✓" : ""}</button></div>
+                      <h2>{unit.title}</h2><p>{unit.summary}</p><div className="tag-row">{unit.keywords.slice(0, 3).map((keyword) => <span key={keyword}>{keyword}</span>)}</div><em>Çalışmaya aç →</em>
+                    </article>;
+                  })}
+                </div>
+              </>
+            ) : (
+              <UnitStudy course={selectedCourse} unit={selectedUnit} completed={store.completed.includes(selectedUnit.id)} onToggle={() => toggleUnit(selectedUnit.id)} onQuiz={() => startQuiz(selectedCourse.code)} />
+            )}
+          </div>
+        )}
+
+        {view === "mistakes" && (
+          <div className="page mistakes-page">
+            <p className="eyebrow">AKILLI TEKRAR</p><h1>Yanlışlarım</h1><p className="lead">Yanlış cevapladığın sorular burada birikir. Doğru cevapladığında listeden otomatik çıkar.</p>
+            {store.mistakes.length ? <><div className="mistake-summary"><strong>{store.mistakes.length}</strong><span>soru tekrar bekliyor</span><button className="primary" onClick={() => startQuiz(undefined, true)}>Yanlışları çöz</button></div><div className="mistake-list">{questions.filter((question) => store.mistakes.includes(question.id)).map((question) => <article key={question.id}><small>{question.course} • Ünite {question.unit}</small><strong>{question.prompt}</strong><p>{question.explanation}</p></article>)}</div></> : <div className="empty-large"><span>✓</span><h2>Bekleyen yanlış yok</h2><p>Deneme çözdükçe yanlış cevapların burada görünecek.</p><button className="primary" onClick={() => startQuiz()}>Karışık deneme başlat</button></div>}
+          </div>
+        )}
+
+        {view === "sources" && (
+          <div className="page sources-page">
+            <p className="eyebrow">SON DENETİM • 10 AĞUSTOS 2026</p>
+            <h1>Kaynak ve doğrulama kaydı</h1>
+            <p className="lead">Buradaki ayrım önemli: ünite adları ve sınav kapsamı resmî Anadolu kaynaklarından; kısa özetler, kavram kartları ve {questions.length} soru ise çalışma amacıyla özgün hazırlanmıştır. Sorular “çıkmış sınav sorusu” değildir.</p>
+
+            <section className="scope-alert">
+              <span>RESMÎ YAZ OKULU KURALI</span>
+              <strong>Her dersin bütün üniteleri sınav kapsamında.</strong>
+              <p>“Son dört ünite daha ağırlıklı çıkar” şeklinde resmî bir oran yayımlanmış değil. Son dört üniteye fazladan tekrar ayırmak yalnızca çalışma stratejisidir.</p>
+              <a href="https://www.anadolu.edu.tr/uploads/anadolu/files/aof_kilavuz/6a0703c8af3bb.pdf" target="_blank" rel="noreferrer">2025–2026 Yaz Okulu Kılavuzu, s. 6 ↗</a>
+            </section>
+
+            <div className="verification-grid">
+              {courses.map((course) => <article key={course.code}>
+                <div className="verified-title"><i style={{ background: course.color }}>✓</i><div><small>{course.code}</small><h2>{course.title}</h2></div></div>
+                <p>{course.verification}</p>
+                <div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}</div>
+              </article>)}
+            </div>
+
+            <section className="method-panel">
+              <h2>Kontrol yöntemi</h2>
+              <ol>
+                <li><span>1</span><p>Ders kodu ve adı, Anadolu Üniversitesi akademik ders sayfasıyla eşleştirildi.</p></li>
+                <li><span>2</span><p>Sekiz ünite başlığı, resmî ders içeriği ve varsa Anadolu Kitap Satış sayfasındaki içindekilerle çapraz kontrol edildi.</p></li>
+                <li><span>3</span><p>Yaz okulu kapsamı, 2025–2026 resmî kayıt kılavuzunun “Sınavda ilgili derse ait ünitelerin tamamından sorumludur” hükmüyle doğrulandı.</p></li>
+                <li><span>4</span><p>Uygulamadaki soruların ünite etiketleri yeni başlıklarla yeniden eşleştirildi; resmî soru iddiası kaldırıldı.</p></li>
+              </ol>
+              <div className="official-links"><a href="https://www.anadolu.edu.tr/acikogretim/ogrenme-ortamlari/kitap-hizmetleri" target="_blank" rel="noreferrer">Güncel PDF’nin esas olduğunu açıklayan Kitap Hizmetleri ↗</a><a href="https://www.anadolu.edu.tr/acikogretim/sinavlar-ve-sorumluluk-uniteleri/sinav-tarihleri" target="_blank" rel="noreferrer">22 Ağustos sınav tarihi ↗</a><a href="https://www.anadolu.edu.tr/acikogretim/sinavlar-ve-sorumluluk-uniteleri/sinavyayinlamasistemi" target="_blank" rel="noreferrer">Resmî çıkmış sorular: eKampüs ↗</a></div>
+            </section>
+          </div>
+        )}
+
+        {view === "quiz" && currentQuestion && (
+          <div className="page quiz-page">
+            {!showResult ? <>
+              <div className="quiz-top"><button className="back-link" onClick={() => setView("dashboard")}>× Denemeden çık</button><span>Soru {quizIndex + 1} / {quiz.length}</span></div>
+              <div className="quiz-progress"><i style={{ width: `${((quizIndex + 1) / quiz.length) * 100}%` }} /></div>
+              <section className="question-card">
+                <div className="question-meta"><span>{currentQuestion.course}</span><span>Ünite {currentQuestion.unit}</span></div>
+                <h1>{currentQuestion.prompt}</h1>
+                <div className="option-list">
+                  {currentQuestion.options.map((option, index) => {
+                    const state = picked === null ? "" : index === currentQuestion.answer ? "correct" : index === picked ? "wrong" : "muted";
+                    return <button key={option} className={state} onClick={() => answerQuestion(index)}><span>{String.fromCharCode(65 + index)}</span>{option}{state === "correct" && <b>✓</b>}{state === "wrong" && <b>×</b>}</button>;
+                  })}
+                </div>
+                {picked !== null && <div className={picked === currentQuestion.answer ? "feedback correct" : "feedback wrong"}><strong>{picked === currentQuestion.answer ? "Doğru cevap" : `Doğru cevap: ${String.fromCharCode(65 + currentQuestion.answer)}`}</strong><p>{currentQuestion.explanation}</p></div>}
+                <div className="question-actions"><span>{picked === null ? "Bilmiyorsan boş bırak; 4 yanlış 1 doğruyu götürüyor." : "Açıklamayı anladıysan devam et."}</span><button className="primary" onClick={() => nextQuestion(picked === null)}>{picked === null ? "Boş bırak" : quizIndex === quiz.length - 1 ? "Sonucu gör" : "Sonraki soru"} →</button></div>
+              </section>
+            </> : <section className="result-card"><span className="result-ring">%{estimated}</span><p className="eyebrow">DENEME TAMAMLANDI</p><h1>{estimated >= 70 ? "Gayet iyi gidiyorsun." : estimated >= 50 ? "Geçiş çizgisine yaklaşıyorsun." : "Yanlışları kapatıp yeniden dene."}</h1><div className="result-stats"><div><strong>{quizCorrect}</strong><span>Doğru</span></div><div><strong>{quizWrong}</strong><span>Yanlış</span></div><div><strong>{quizBlank}</strong><span>Boş</span></div><div><strong>{net.toFixed(2)}</strong><span>Net</span></div></div><p>Bu hesaplama çalışma tahminidir. Gerçek harf notu üniversitenin değerlendirme sistemine göre belirlenir.</p><div className="hero-actions"><button className="primary" onClick={() => startQuiz()}>Yeni deneme</button><button className="ghost" onClick={() => setView("mistakes")}>Yanlışları gör</button></div></section>}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function UnitStudy({ course, unit, completed, onToggle, onQuiz }: { course: Course; unit: Unit; completed: boolean; onToggle: () => void; onQuiz: () => void }) {
+  const unitNumber = course.units.indexOf(unit) + 1;
+  return <div className="study-layout">
+    <article className="study-main">
+      <p className="eyebrow" style={{ color: course.color }}>{course.code} • ÜNİTE {unitNumber}</p><h1>{unit.title}</h1><p className="study-summary">{unit.summary}</p>
+      <section><h2>Sınav için kritik noktalar</h2><ol>{unit.keyPoints.map((point, index) => <li key={point}><span>{index + 1}</span><p>{point}</p></li>)}</ol></section>
+      <section><h2>Kavram kartları</h2><div className="flash-grid">{unit.keywords.map((keyword) => <div key={keyword}><span>KAVRAM</span><strong>{keyword}</strong><small>Kendi cümlenle açıklamayı dene.</small></div>)}</div></section>
+      <div className="source-note"><strong>10 Ağustos 2026 tarihinde doğrulandı</strong><p>{course.verification} Bu sayfadaki özet ve sorular çalışma amaçlı özgün anlatımlardır; resmî çıkmış soru değildir.</p><div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}</div></div>
+    </article>
+    <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className="ghost" onClick={onQuiz}>Bu dersten soru çöz</button><small>İpucu: Özeti kapatıp üç kritik noktayı sesli anlatabiliyorsan üniteyi tamamla.</small></aside>
+  </div>;
+}
