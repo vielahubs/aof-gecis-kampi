@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Course, Question, Unit, courses, questions } from "./study-data";
 import { examGuides } from "./exam-guides";
 
-type View = "dashboard" | "course" | "quiz" | "mistakes" | "sources";
+type View = "dashboard" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
 type StoredState = {
   completed: string[];
@@ -140,6 +140,7 @@ export default function Home() {
 
         <nav className="main-nav" aria-label="Ana menü">
           <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><span>⌂</span> Genel Bakış</button>
+          <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")}><span>▦</span> İlerleme Haritası</button>
           <button className={view === "mistakes" ? "active" : ""} onClick={() => setView("mistakes")}><span>↺</span> Yanlışlarım <em>{store.mistakes.length}</em></button>
           <button onClick={() => startQuiz()}><span>▶</span> Karışık Deneme</button>
           <button className={view === "sources" ? "active" : ""} onClick={() => setView("sources")}><span>✓</span> Kaynak Kontrolü</button>
@@ -210,7 +211,7 @@ export default function Home() {
               </section>
 
               <section className="panel courses-panel">
-                <div className="panel-heading"><div><p className="eyebrow">DERSLER</p><h2>İlerleme haritası</h2></div></div>
+                <div className="panel-heading"><div><p className="eyebrow">DERSLER</p><h2>Hızlı ders geçişi</h2></div><button className="panel-link" onClick={() => setView("progress")}>Haritayı aç →</button></div>
                 <div className="course-cards">
                   {courses.map((course) => {
                     const done = course.units.filter((unit) => store.completed.includes(unit.id)).length;
@@ -219,6 +220,43 @@ export default function Home() {
                 </div>
               </section>
             </div>
+          </div>
+        )}
+
+        {view === "progress" && (
+          <div className="page progress-page">
+            <section className="progress-heading">
+              <div><p className="eyebrow">5 DERS • 40 ÜNİTE</p><h1>İlerleme Haritası</h1><p>Çalıştığın ve sırada bekleyen bütün üniteleri tek ekrandan takip et. Bir üniteye dokunarak doğrudan konu anlatımına geçebilirsin.</p></div>
+              <div className="progress-total"><span>Genel tamamlanma</span><strong>%{completion}</strong><div><i style={{ width: `${completion}%` }} /></div><small>{store.completed.length} tamamlandı · {totalUnits - store.completed.length} ünite kaldı</small></div>
+            </section>
+
+            <div className="progress-legend" aria-label="İlerleme durumları"><span><i className="legend-done" /> Tamamlandı</span><span><i /> Çalışılacak</span></div>
+
+            <section className="progress-course-list">
+              {courses.map((course) => {
+                const done = course.units.filter((unit) => store.completed.includes(unit.id)).length;
+                return <article className="progress-course" key={course.code} style={{ "--course-color": course.color } as React.CSSProperties}>
+                  <header>
+                    <div className="progress-course-title"><span>{course.short.slice(0, 2).toUpperCase()}</span><div><small>{course.code}</small><h2>{course.title}</h2></div></div>
+                    <div className="progress-course-score"><strong>{done}/8</strong><span>%{Math.round((done / 8) * 100)} tamamlandı</span></div>
+                  </header>
+                  <div className="course-progress-bar"><i style={{ width: `${done * 12.5}%` }} /></div>
+                  <div className="progress-unit-grid">
+                    {course.units.map((unit, index) => {
+                      const completed = store.completed.includes(unit.id);
+                      return <article className={completed ? "progress-unit done" : "progress-unit"} key={unit.id}>
+                        <button className="progress-unit-open" onClick={() => { openCourse(course); setSelectedUnit(unit); }}>
+                          <small>ÜNİTE {String(index + 1).padStart(2, "0")}</small>
+                          <strong>{unit.title}</strong>
+                          <span>{completed ? "Tamamlandı" : "Konuya git"} →</span>
+                        </button>
+                        <button className="progress-unit-check" onClick={() => toggleUnit(unit.id)} aria-label={completed ? `${unit.title} ünitesini tamamlanmadı işaretle` : `${unit.title} ünitesini tamamlandı işaretle`}>{completed ? "✓" : ""}</button>
+                      </article>;
+                    })}
+                  </div>
+                </article>;
+              })}
+            </section>
           </div>
         )}
 
