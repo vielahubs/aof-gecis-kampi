@@ -86,10 +86,11 @@ export default function Home() {
     }));
   }
 
-  function startQuiz(courseCode?: string, mistakeOnly = false) {
+  function startQuiz(courseCode?: string, mistakeOnly = false, unitNumber?: number) {
     let pool = questions;
     if (mistakeOnly) pool = questions.filter((question) => store.mistakes.includes(question.id));
     else if (courseCode) pool = questions.filter((question) => question.course === courseCode);
+    if (unitNumber) pool = pool.filter((question) => question.unit === unitNumber);
     const next = shuffle(pool).slice(0, Math.min(10, pool.length));
     if (!next.length) return;
     setQuiz(next);
@@ -280,7 +281,7 @@ export default function Home() {
                 </div>
               </>
             ) : (
-              <UnitStudy course={selectedCourse} unit={selectedUnit} completed={store.completed.includes(selectedUnit.id)} onToggle={() => toggleUnit(selectedUnit.id)} onQuiz={() => startQuiz(selectedCourse.code)} />
+              <UnitStudy course={selectedCourse} unit={selectedUnit} completed={store.completed.includes(selectedUnit.id)} onToggle={() => toggleUnit(selectedUnit.id)} onQuiz={(unitNumber) => startQuiz(selectedCourse.code, false, unitNumber)} onCourseQuiz={() => startQuiz(selectedCourse.code)} />
             )}
           </div>
         )}
@@ -361,21 +362,28 @@ export default function Home() {
   );
 }
 
-function UnitStudy({ course, unit, completed, onToggle, onQuiz }: { course: Course; unit: Unit; completed: boolean; onToggle: () => void; onQuiz: () => void }) {
+function UnitStudy({ course, unit, completed, onToggle, onQuiz, onCourseQuiz }: { course: Course; unit: Unit; completed: boolean; onToggle: () => void; onQuiz: (unitNumber: number) => void; onCourseQuiz: () => void }) {
   const unitNumber = course.units.indexOf(unit) + 1;
   const guide = examGuides[unit.id];
+  const unitQuestionCount = questions.filter((question) => question.course === course.code && question.unit === unitNumber).length;
   return <div className="study-layout">
     <article className="study-main">
       <p className="eyebrow" style={{ color: course.color }}>{course.code} • ÜNİTE {unitNumber}</p><h1>{unit.title}</h1><p className="study-summary">{unit.summary}</p>
+      <section className="must-know" style={{ "--course-color": course.color } as React.CSSProperties}>
+        <header><div><span>SINAVLIK HIZLI ÖZET</span><h2>Bu üniteden mutlaka bil</h2></div><strong>{unit.keyPoints.length + guide.signals.length} kritik işaret</strong></header>
+        <div className="must-know-grid">
+          <div className="critical-facts"><h3>Kritik bilgiler</h3><ol>{unit.keyPoints.map((point, index) => <li key={point}><span>{index + 1}</span><p>{point}</p></li>)}</ol></div>
+          <div className="keyword-box"><h3>Soruda görünce tanı</h3><div>{guide.signals.map((signal) => <span key={signal}>{signal}</span>)}</div><small>Bu ifadeler soru kökünde veya seçeneklerde geçtiğinde ünitenin ilgili kavramını hatırla.</small></div>
+        </div>
+        <div className="question-patterns"><h3>Soru kalıpları</h3><div>{guide.patterns.map((pattern, index) => <p key={pattern}><span>{index + 1}</span>{pattern}</p>)}</div></div>
+        <div className="quick-recall"><div><span>⚠ KARIŞTIRMA</span><p>{guide.trap}</p></div><div><span>⏱ 2 DAKİKALIK TEKRAR</span><p>{guide.hook}</p></div></div>
+        <div className="unit-check-action"><div><strong>Kendini kontrol et</strong><small>{unitQuestionCount ? `Bu ünite için ${unitQuestionCount} özgün kontrol sorusu hazır.` : "Bu üniteye özel soru henüz yok; ders denemesinden devam edebilirsin."}</small></div><button className="primary" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Ünite sorusunu çöz" : "Ders denemesini aç"} →</button></div>
+      </section>
       <div className="exam-evidence"><span>ÇIKMIŞ SORU ANALİZİ</span><strong>3 yaz okulu • 60 soru / ders</strong><p>Bu ünitenin anlatımı, sorularda görülen kavram ve çeldirici kalıplarına göre genişletildi.</p></div>
       <section className="lesson-copy"><h2>Konuyu anlayarak öğren</h2>{guide.lesson.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</section>
-      <section><h2>Soruda görünce uyan</h2><div className="signal-grid">{guide.signals.map((signal) => <span key={signal}>{signal}</span>)}</div></section>
-      <section><h2>Soru nasıl geliyor?</h2><ol>{guide.patterns.map((pattern, index) => <li key={pattern}><span>{index + 1}</span><p>{pattern}</p></li>)}</ol></section>
-      <div className="trap-grid"><div><span>EN SIK KARIŞAN</span><p>{guide.trap}</p></div><div><span>HAFIZA KANCASI</span><p>{guide.hook}</p></div></div>
-      <section><h2>Kitap kapsamından hızlı doğrulama</h2><ol>{unit.keyPoints.map((point, index) => <li key={point}><span>{index + 1}</span><p>{point}</p></li>)}</ol></section>
       <section><h2>Kavram kartları</h2><div className="flash-grid">{unit.keywords.map((keyword) => <div key={keyword}><span>KAVRAM</span><strong>{keyword}</strong><small>Kendi cümlenle açıklamayı dene.</small></div>)}</div></section>
       <div className="source-note"><strong>10 Ağustos 2026 tarihinde doğrulandı</strong><p>{course.verification} Soru eğilimleri {course.archivePeriods} dönemlerinden çıkarıldı. Açık arşiv resmî değildir; kesin metin ve cevap anahtarı için eKampüs esas alınır.</p><div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}<a href={course.archiveSource} target="_blank" rel="noreferrer">İncelenen soru arşivi ↗</a></div></div>
     </article>
-    <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className="ghost" onClick={onQuiz}>Bu dersten soru çöz</button><small>İpucu: Özeti kapatıp üç kritik noktayı sesli anlatabiliyorsan üniteyi tamamla.</small></aside>
+    <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className="ghost" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Bu üniteden soru çöz" : "Bu dersten soru çöz"}</button><small>İpucu: Hızlı özeti kapatıp üç kritik noktayı sesli anlatabiliyorsan üniteyi tamamla.</small></aside>
   </div>;
 }
