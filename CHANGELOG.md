@@ -2,7 +2,7 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
-## v1.1.0 - 2026-08-10
+## v0.2.0 - 2026-08-10
 
 ### Eklendi
 
@@ -15,7 +15,7 @@ Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedili
 
 - Karanlık görünümde kartlar, sorular, doğru-yanlış geri bildirimleri ve kaynak alanlarının okunabilirliği.
 
-## v1.0.0 - 2026-08-10
+## v0.1.0 - 2026-08-10
 
 ### Eklendi
 
