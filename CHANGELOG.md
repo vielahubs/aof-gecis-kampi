@@ -2,6 +2,14 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.5.0 - 2026-08-10
+
+### Eklendi
+
+- Atatürk İlkeleri ve İnkılap Tarihi I dersinin sekiz ünitesine ayrıntılı, başlıklara ayrılmış sınav anlatımları.
+- Olayların kronolojisini, neden–sonuç ilişkilerini ve sık karıştırılan kavramları açıklayan çalışma metinleri.
+- Uzun anlatımlar için mobil ve karanlık modla uyumlu okunabilir bölüm kartları.
+
 ## v0.4.0 - 2026-08-10
 
 ### Eklendi
