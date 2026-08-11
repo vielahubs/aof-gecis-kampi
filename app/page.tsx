@@ -5,7 +5,7 @@ import { Course, Question, Unit, courses, questions } from "./study-data";
 import { examGuides } from "./exam-guides";
 import { historyDeepDives } from "./history-deep-dives";
 
-type View = "dashboard" | "search" | "review" | "progress" | "course" | "quiz" | "mistakes" | "sources";
+type View = "dashboard" | "search" | "review" | "focus" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
 type StoredState = {
   completed: string[];
@@ -14,9 +14,11 @@ type StoredState = {
   correct: number;
   bookmarks: string[];
   notes: Record<string, string>;
+  focusMinutes: number;
+  focusSessions: number;
 };
 
-const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {} };
+const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {}, focusMinutes: 0, focusSessions: 0 };
 const lastUnitStorageKey = "aof-gecis-kampi-last-unit";
 
 function normalizeSearch(value: string) {
@@ -49,6 +51,10 @@ export default function Home() {
   const [showResult, setShowResult] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [lastUnitId, setLastUnitId] = useState<string | null>(null);
+  const [focusDuration, setFocusDuration] = useState(25);
+  const [focusSeconds, setFocusSeconds] = useState(25 * 60);
+  const [focusRunning, setFocusRunning] = useState(false);
+  const [focusCompleted, setFocusCompleted] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -64,6 +70,8 @@ export default function Home() {
             correct: typeof parsed.correct === "number" ? parsed.correct : 0,
             bookmarks: Array.isArray(parsed.bookmarks) ? parsed.bookmarks : [],
             notes: parsedNotes,
+            focusMinutes: typeof parsed.focusMinutes === "number" ? parsed.focusMinutes : 0,
+            focusSessions: typeof parsed.focusSessions === "number" ? parsed.focusSessions : 0,
           });
         } catch { setStore(initialStore); }
       }
@@ -89,6 +97,19 @@ export default function Home() {
   useEffect(() => {
     if (ready && lastUnitId) window.localStorage.setItem(lastUnitStorageKey, lastUnitId);
   }, [lastUnitId, ready]);
+
+  useEffect(() => {
+    if (!focusRunning) return;
+    const timer = window.setTimeout(() => {
+      if (focusSeconds <= 1) {
+        setFocusSeconds(0);
+        setFocusRunning(false);
+        setFocusCompleted(true);
+        setStore((prev) => ({ ...prev, focusMinutes: prev.focusMinutes + focusDuration, focusSessions: prev.focusSessions + 1 }));
+      } else setFocusSeconds(focusSeconds - 1);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [focusDuration, focusRunning, focusSeconds]);
 
   const totalUnits = courses.reduce((sum, course) => sum + course.units.length, 0);
   const completion = Math.round((store.completed.length / totalUnits) * 100);
@@ -160,6 +181,25 @@ export default function Home() {
     setStore((prev) => ({ ...prev, notes: { ...prev.notes, [id]: note } }));
   }
 
+  function chooseFocusDuration(minutes: number) {
+    setFocusDuration(minutes);
+    setFocusSeconds(minutes * 60);
+    setFocusRunning(false);
+    setFocusCompleted(false);
+  }
+
+  function toggleFocusTimer() {
+    if (focusSeconds === 0) setFocusSeconds(focusDuration * 60);
+    setFocusCompleted(false);
+    setFocusRunning((running) => !running);
+  }
+
+  function resetFocusTimer() {
+    setFocusSeconds(focusDuration * 60);
+    setFocusRunning(false);
+    setFocusCompleted(false);
+  }
+
   function startQuiz(courseCode?: string, mistakeOnly = false, unitNumber?: number) {
     let pool = questions;
     if (mistakeOnly) pool = questions.filter((question) => store.mistakes.includes(question.id));
@@ -204,6 +244,9 @@ export default function Home() {
   const currentQuestion = quiz[quizIndex];
   const net = quizCorrect - quizWrong / 4;
   const estimated = quiz.length ? Math.max(0, Math.round((net / quiz.length) * 100)) : 0;
+  const focusClock = `${String(Math.floor(focusSeconds / 60)).padStart(2, "0")}:${String(focusSeconds % 60).padStart(2, "0")}`;
+  const focusProgress = Math.round((1 - focusSeconds / (focusDuration * 60)) * 100);
+  const focusTotal = store.focusMinutes >= 60 ? `${Math.floor(store.focusMinutes / 60)} sa ${store.focusMinutes % 60} dk` : `${store.focusMinutes} dk`;
 
   return (
     <main className="app-shell">
@@ -217,6 +260,7 @@ export default function Home() {
           <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><span>⌂</span> Genel Bakış</button>
           <button className={view === "search" ? "active" : ""} onClick={() => setView("search")}><span>⌕</span> İçerikte Ara</button>
           <button className={view === "review" ? "active" : ""} onClick={() => setView("review")}><span>★</span> Tekrar Panosu <em>{reviewUnits.length}</em></button>
+          <button className={view === "focus" ? "active" : ""} onClick={() => setView("focus")}><span>◷</span> Odak Sayacı</button>
           <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")}><span>▦</span> İlerleme Haritası</button>
           <button className={view === "mistakes" ? "active" : ""} onClick={() => setView("mistakes")}><span>↺</span> Yanlışlarım <em>{store.mistakes.length}</em></button>
           <button onClick={() => startQuiz()}><span>▶</span> Karışık Deneme</button>
@@ -245,7 +289,7 @@ export default function Home() {
       <section className="content">
         <header className="topbar">
           <div><span className="status-dot" /> Veriler bu cihazda saklanıyor</div>
-          <div className="top-actions"><button className="theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "Açık temaya geç" : "Karanlık temaya geç"}>{theme === "dark" ? "☀ Açık" : "☾ Koyu"}</button><span className="date-pill">22 AĞU</span><button onClick={() => startQuiz()}>Hızlı deneme</button></div>
+          <div className="top-actions"><button className={focusRunning ? "focus-mini running" : "focus-mini"} onClick={() => setView("focus")}>{focusRunning ? `◉ ${focusClock}` : "◷ Odak"}</button><button className="theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "Açık temaya geç" : "Karanlık temaya geç"}>{theme === "dark" ? "☀ Açık" : "☾ Koyu"}</button><span className="date-pill">22 AĞU</span><button onClick={() => startQuiz()}>Hızlı deneme</button></div>
         </header>
 
         {view === "dashboard" && (
@@ -344,6 +388,28 @@ export default function Home() {
                 <button className="review-open" onClick={() => openUnit(course, unit)}>Üniteyi aç →</button>
               </article>;
             })}</div> : <div className="empty-large"><span>★</span><h2>Tekrar panon boş</h2><p>Bir ünitenin anlatımını açıp “Tekrar listeme ekle” düğmesine bas veya kişisel not yaz.</p><button className="primary" onClick={() => setView("progress")}>Üniteleri incele</button></div>}
+          </div>
+        )}
+
+        {view === "focus" && (
+          <div className="page focus-page">
+            <p className="eyebrow">DİKKATİ DAĞITMADAN ÇALIŞ</p>
+            <h1>Odak Sayacı</h1>
+            <p className="lead">Bir süre seç, tek üniteye odaklan ve tamamlanan çalışma oturumlarını cihazında biriktir.</p>
+            <div className="focus-layout">
+              <section className="focus-timer-panel">
+                <div className="focus-presets" aria-label="Odak süresi seçimi">{[15, 25, 45].map((minutes) => <button key={minutes} className={focusDuration === minutes ? "active" : ""} onClick={() => chooseFocusDuration(minutes)}>{minutes} dk</button>)}</div>
+                <div className="focus-ring" style={{ "--focus-progress": `${focusProgress * 3.6}deg` } as React.CSSProperties}><div><span>{focusRunning ? "ODAKLAN" : focusCompleted ? "TAMAMLANDI" : "HAZIR"}</span><strong>{focusClock}</strong><small>{focusProgress}% tamamlandı</small></div></div>
+                {focusCompleted && <div className="focus-success">✓ Odak oturumu kaydedildi. Kısa bir mola ver.</div>}
+                <div className="focus-actions"><button className="primary" onClick={toggleFocusTimer}>{focusRunning ? "Duraklat" : focusSeconds === focusDuration * 60 ? "Başlat" : focusSeconds === 0 ? "Yeniden başlat" : "Devam et"}</button><button className="ghost" onClick={resetFocusTimer}>Sıfırla</button></div>
+                <p className="focus-hint">Sayaç başka bir sayfaya geçsen bile çalışmaya devam eder. Tamamlanan oturum süreleri otomatik kaydedilir.</p>
+              </section>
+              <aside className="focus-side">
+                <section><p className="eyebrow">ODAK GEÇMİŞİ</p><div className="focus-stats"><article><strong>{store.focusSessions}</strong><span>tamamlanan oturum</span></article><article><strong>{focusTotal}</strong><span>toplam odak süresi</span></article></div></section>
+                <section className="focus-target"><div><span>Önerilen günlük hedef</span><strong>4 × 25 dakika</strong></div><div className="course-progress-bar"><i style={{ width: `${Math.min(100, (store.focusMinutes / 100) * 100)}%` }} /></div><small>Her oturumdan sonra 5 dakika ara ver.</small></section>
+                {lastUnit ? <button className="focus-current" onClick={() => openUnit(lastUnit.course, lastUnit.unit)} style={{ "--course-color": lastUnit.course.color } as React.CSSProperties}><small>ÇALIŞTIĞIN ÜNİTE</small><strong>{lastUnit.unit.title}</strong><span>Anlatımı aç →</span></button> : <button className="focus-current" onClick={() => setView("progress")}><small>ÇALIŞMA KONUSU</small><strong>Önce bir ünite seç</strong><span>Haritayı aç →</span></button>}
+              </aside>
+            </div>
           </div>
         )}
 

@@ -2,6 +2,20 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.10.0 - 2026-08-11
+
+### Eklendi
+
+- 15, 25 ve 45 dakikalık çalışma seçenekleri sunan Odak Sayacı.
+- Çalışırken başka ünite sayfalarına geçildiğinde de devam eden sayaç göstergesi.
+- Tamamlanan oturum sayısı ve toplam odak süresinin cihazda saklanması.
+- Son çalışılan üniteye Odak Sayacı ekranından doğrudan dönme.
+
+### İyileştirildi
+
+- Mobil ana menü, yeni çalışma araçlarını daha rahat göstermek için iki satırlı düzene geçirildi.
+- Önceki sürümlerdeki ilerleme, not ve tekrar listesi verilerini koruyan yerel veri geçişi genişletildi.
+
 ## v0.9.0 - 2026-08-11
 
 ### Eklendi
