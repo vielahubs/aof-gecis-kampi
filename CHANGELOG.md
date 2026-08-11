@@ -2,6 +2,25 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.7.0 - 2026-08-11
+
+### Eklendi
+
+- İçerik Yönetim Sistemleri, İnternet Tabanlı Programlama ve Ağ Yönetimi ve Bilgi Güvenliği derslerinin sekiz ünitesine ayrıntılı çalışma anlatımları.
+- Her ünite için temel kavram ayrımları, mimari/akış açıklamaları, sık karıştırılan terimler ve soru ipuçları.
+
+## v0.6.0 - 2026-08-11
+
+### Eklendi
+
+- Atatürk İlkeleri ve İnkılap Tarihi II dersinin sekiz ünitesine ayrıntılı, başlıklara ayrılmış sınav anlatımları.
+- İnkılaplar, Atatürk ilkeleri, II. Dünya Savaşı, Demokrat Parti, darbeler, Özal yılları, koalisyonlar ve 2002–2018 dönemi için kronoloji, kavram ayrımı ve soru ipuçları.
+- Yaz okulu soru örneklerinde görülen kurum, kanun, olay ve dönem eşleştirmelerini destekleyen çalışma bağlamı.
+
+### Düzeltilenler
+
+- Derleme yardımcıları, çalıştırma izni korunmayan ortamlarda da Bash üzerinden güvenle çalışacak biçimde düzenlendi.
+
 ## v0.5.0 - 2026-08-10
 
 ### Eklendi
