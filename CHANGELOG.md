@@ -2,6 +2,15 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.7.1 - 2026-08-11
+
+### Düzeltilenler
+
+- Kod denetimini durduran kaçışsız metin karakteri düzeltildi.
+- Üretilmiş derleme dosyalarının kaynak kod denetimine yanlışlıkla katılması önlendi.
+- Cloudflare Worker ve veritabanı bağlayıcılarının TypeScript tip denetimi düzeltildi.
+- Test komutu; kod denetimi, tip kontrolü, üretim derlemesi ve HTML testini birlikte çalıştıracak biçimde güçlendirildi.
+
 ## v0.7.0 - 2026-08-11
 
 ### Eklendi
