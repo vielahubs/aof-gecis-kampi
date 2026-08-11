@@ -87,6 +87,18 @@ export default function LiveDuel() {
     if (!roomId) return;
     let active = true;
 
+    async function refreshRoom() {
+      const { data, error: roomError } = await supabase.from("rooms").select("*").eq("id", roomId).maybeSingle();
+      if (!active || roomError) return;
+      if (data) setRoom(data as Room);
+      else {
+        setRoom(null);
+        setPlayers([]);
+        setAnswers([]);
+        setError("Oda artık açık değil.");
+      }
+    }
+
     async function refreshPlayers() {
       const { data, error: playersError } = await supabase.from("players").select("*").eq("room_id", roomId).order("joined_at");
       if (active && !playersError) setPlayers((data ?? []) as Player[]);
@@ -97,8 +109,13 @@ export default function LiveDuel() {
       if (active && !answersError) setAnswers((data ?? []) as DuelAnswer[]);
     }
 
-    void refreshPlayers();
-    void refreshAnswers();
+    function refreshDuel() {
+      void refreshRoom();
+      void refreshPlayers();
+      void refreshAnswers();
+    }
+
+    refreshDuel();
 
     const channel = supabase
       .channel(`duel-${roomId}`)
@@ -119,10 +136,17 @@ export default function LiveDuel() {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `room_id=eq.${roomId}` }, () => { void refreshPlayers(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "answers", filter: `room_id=eq.${roomId}` }, () => { void refreshAnswers(); })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") refreshDuel();
+      });
+
+    // Realtime bildirimi ağ veya tarayıcı nedeniyle kaçarsa iki ekranın birkaç
+    // saniye içinde yeniden eşitlenmesini sağlar.
+    const refreshTimer = window.setInterval(refreshDuel, 2500);
 
     return () => {
       active = false;
+      window.clearInterval(refreshTimer);
       void supabase.removeChannel(channel);
     };
   }, [roomId]);
@@ -261,10 +285,22 @@ export default function LiveDuel() {
       points,
     }]);
 
+    // Ekrandaki skor Realtime\'dan henüz yenilenmemiş olabilir. Önce sunucudaki
+    // son değeri okuyarak hızlı soru geçişlerinde puanın geri yazılmasını önle.
+    const { data: latestPlayer, error: playerReadError } = await supabase
+      .from("players")
+      .select("score,correct_count,wrong_count")
+      .eq("id", ownPlayer.id)
+      .single();
+    if (playerReadError) {
+      setError(errorMessage(playerReadError));
+      return;
+    }
+
     const { error: scoreError } = await supabase.from("players").update({
-      score: ownPlayer.score + points,
-      correct_count: ownPlayer.correct_count + (correct ? 1 : 0),
-      wrong_count: ownPlayer.wrong_count + (correct ? 0 : 1),
+      score: latestPlayer.score + points,
+      correct_count: latestPlayer.correct_count + (correct ? 1 : 0),
+      wrong_count: latestPlayer.wrong_count + (correct ? 0 : 1),
     }).eq("id", ownPlayer.id);
     if (scoreError) setError(errorMessage(scoreError));
   }
