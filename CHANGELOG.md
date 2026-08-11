@@ -2,6 +2,19 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.8.0 - 2026-08-11
+
+### Eklendi
+
+- Kırk ünitenin özetlerini, kritik bilgilerini, sınav sinyallerini ve ayrıntılı anlatımlarını birlikte tarayan içerik araması.
+- Son açılan üniteyi cihazda hatırlayan “Kaldığın yerden devam et” alanı.
+- Konu anlatımlarının sonunda önceki ve sonraki üniteye doğrudan geçiş.
+
+### İyileştirildi
+
+- Günlük plandaki ana eylem, ders sayfası yerine doğrudan sıradaki üniteyi açacak biçimde düzeltildi.
+- Yeni arama ve gezinme bileşenleri mobil görünüm ve karanlık temayla uyumlu hâle getirildi.
+
 ## v0.7.1 - 2026-08-11
 
 ### Düzeltilenler

@@ -5,7 +5,7 @@ import { Course, Question, Unit, courses, questions } from "./study-data";
 import { examGuides } from "./exam-guides";
 import { historyDeepDives } from "./history-deep-dives";
 
-type View = "dashboard" | "progress" | "course" | "quiz" | "mistakes" | "sources";
+type View = "dashboard" | "search" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
 type StoredState = {
   completed: string[];
@@ -15,6 +15,11 @@ type StoredState = {
 };
 
 const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0 };
+const lastUnitStorageKey = "aof-gecis-kampi-last-unit";
+
+function normalizeSearch(value: string) {
+  return value.toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
 
 function daysToExam() {
   const now = new Date();
@@ -40,6 +45,8 @@ export default function Home() {
   const [quizWrong, setQuizWrong] = useState(0);
   const [quizBlank, setQuizBlank] = useState(0);
   const [showResult, setShowResult] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [lastUnitId, setLastUnitId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -50,6 +57,8 @@ export default function Home() {
       const savedTheme = window.localStorage.getItem("aof-gecis-kampi-theme");
       const preferredTheme: Theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       setTheme(savedTheme === "dark" || savedTheme === "light" ? savedTheme : preferredTheme);
+      const savedUnitId = window.localStorage.getItem(lastUnitStorageKey);
+      if (savedUnitId && courses.some((course) => course.units.some((unit) => unit.id === savedUnitId))) setLastUnitId(savedUnitId);
       setReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -64,6 +73,10 @@ export default function Home() {
     if (ready) window.localStorage.setItem("aof-gecis-kampi-theme", theme);
   }, [theme, ready]);
 
+  useEffect(() => {
+    if (ready && lastUnitId) window.localStorage.setItem(lastUnitStorageKey, lastUnitId);
+  }, [lastUnitId, ready]);
+
   const totalUnits = courses.reduce((sum, course) => sum + course.units.length, 0);
   const completion = Math.round((store.completed.length / totalUnits) * 100);
   const accuracy = store.answered ? Math.round((store.correct / store.answered) * 100) : 0;
@@ -74,9 +87,43 @@ export default function Home() {
     return unfinished.slice(0, 5);
   }, [store.completed]);
 
+  const lastUnit = useMemo(() => courses.flatMap((course) => course.units.map((unit, index) => ({ course, unit, unitNumber: index + 1 }))).find(({ unit }) => unit.id === lastUnitId), [lastUnitId]);
+
+  const searchResults = useMemo(() => {
+    const query = normalizeSearch(searchQuery.trim());
+    if (!query) return [];
+    return courses.flatMap((course) => course.units.map((unit, index) => {
+      const guide = examGuides[unit.id];
+      const deepDive = historyDeepDives[unit.id] ?? [];
+      const searchable = normalizeSearch([
+        course.code,
+        course.title,
+        course.short,
+        unit.title,
+        unit.summary,
+        ...unit.keyPoints,
+        ...unit.keywords,
+        ...guide.signals,
+        ...guide.patterns,
+        guide.trap,
+        guide.hook,
+        ...guide.lesson,
+        ...deepDive.flatMap((section) => [section.title, section.body]),
+      ].join(" "));
+      return { course, unit, unitNumber: index + 1, matches: searchable.includes(query) };
+    })).filter((result) => result.matches);
+  }, [searchQuery]);
+
   function openCourse(course: Course) {
     setSelectedCourse(course);
     setSelectedUnit(null);
+    setView("course");
+  }
+
+  function openUnit(course: Course, unit: Unit) {
+    setSelectedCourse(course);
+    setSelectedUnit(unit);
+    setLastUnitId(unit.id);
     setView("course");
   }
 
@@ -142,6 +189,7 @@ export default function Home() {
 
         <nav className="main-nav" aria-label="Ana menü">
           <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><span>⌂</span> Genel Bakış</button>
+          <button className={view === "search" ? "active" : ""} onClick={() => setView("search")}><span>⌕</span> İçerikte Ara</button>
           <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")}><span>▦</span> İlerleme Haritası</button>
           <button className={view === "mistakes" ? "active" : ""} onClick={() => setView("mistakes")}><span>↺</span> Yanlışlarım <em>{store.mistakes.length}</em></button>
           <button onClick={() => startQuiz()}><span>▶</span> Karışık Deneme</button>
@@ -180,7 +228,7 @@ export default function Home() {
                 <p className="eyebrow">YAZ OKULU • 5 DERS • 40 ÜNİTE</p>
                 <h1>Geçmek için ne çalışacağını<br />her gün netleştir.</h1>
                 <p>Bütün üniteler kapsamda. 300 yaz okulu sorusu tarandı; tekrar eden kavramlar konu anlatımlarına ve sınav tuzaklarına dönüştürüldü.</p>
-                <div className="hero-actions"><button className="primary" onClick={() => todaysUnits[0] && openCourse(todaysUnits[0].course)}>Bugünün planına başla <span>→</span></button><button className="ghost" onClick={() => startQuiz()}>Seviye denemesi</button><button className="ghost" onClick={() => setView("sources")}>Kaynakları gör</button></div>
+                <div className="hero-actions"><button className="primary" onClick={() => lastUnit ? openUnit(lastUnit.course, lastUnit.unit) : todaysUnits[0] && openUnit(todaysUnits[0].course, todaysUnits[0].unit)}>{lastUnit ? "Kaldığın yerden devam et" : "Bugünün planına başla"} <span>→</span></button><button className="ghost" onClick={() => startQuiz()}>Seviye denemesi</button><button className="ghost" onClick={() => setView("sources")}>Kaynakları gör</button></div>
               </div>
               <div className="countdown-card">
                 <span>Sınava kalan</span>
@@ -190,6 +238,8 @@ export default function Home() {
                 <small>{store.completed.length} / {totalUnits} ünite tamamlandı</small>
               </div>
             </section>
+
+            {lastUnit && <button className="resume-card" onClick={() => openUnit(lastUnit.course, lastUnit.unit)} style={{ "--course-color": lastUnit.course.color } as React.CSSProperties}><span className="resume-icon">↗</span><span><small>KALDIĞIN YER</small><strong>{lastUnit.course.short} · Ünite {lastUnit.unitNumber}: {lastUnit.unit.title}</strong></span><em>Devam et →</em></button>}
 
             <section className="stat-grid">
               <article><span>Genel ilerleme</span><strong>%{completion}</strong><small>40 ünitenin {store.completed.length} tanesi tamam</small></article>
@@ -203,7 +253,7 @@ export default function Home() {
                 <div className="panel-heading"><div><p className="eyebrow">BUGÜN</p><h2>Çalışma rotan</h2></div><span>{todaysUnits.length} görev</span></div>
                 <div className="task-list">
                   {todaysUnits.length ? todaysUnits.map(({ course, unit }, index) => (
-                    <button key={unit.id} onClick={() => { openCourse(course); setSelectedUnit(unit); }}>
+                    <button key={unit.id} onClick={() => openUnit(course, unit)}>
                       <span className="task-index">{String(index + 1).padStart(2, "0")}</span>
                       <span className="task-copy"><small style={{ color: course.color }}>{course.code}</small><strong>Ünite {course.units.indexOf(unit) + 1} · {unit.title}</strong><em>Konu anlatımı + soru sinyalleri + hafıza kancası</em></span>
                       <span className="task-arrow">→</span>
@@ -222,6 +272,28 @@ export default function Home() {
                 </div>
               </section>
             </div>
+          </div>
+        )}
+
+        {view === "search" && (
+          <div className="page search-page">
+            <p className="eyebrow">40 ÜNİTENİN TAMAMINDA</p>
+            <h1>İçerikte ara</h1>
+            <p className="lead">Kavram, kişi, olay veya teknoloji yaz; özetleri, kritik bilgileri, sınav sinyallerini ve ayrıntılı anlatımları birlikte tara.</p>
+            <label className="search-box">
+              <span>⌕</span>
+              <input autoFocus value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Örn. Mondros, PHP, TLS, Tevhid-i Tedrisat..." aria-label="Ders içeriklerinde ara" />
+              {searchQuery && <button onClick={() => setSearchQuery("")} aria-label="Aramayı temizle">×</button>}
+            </label>
+            {!searchQuery.trim() ? <section className="search-empty"><strong>Neyi tekrar etmek istiyorsun?</strong><p>Bir örnek seçebilir veya yukarıya kendi aramanı yazabilirsin.</p><div>{["Mondros", "PHP", "TLS", "Tevhid-i Tedrisat"].map((example) => <button key={example} onClick={() => setSearchQuery(example)}>{example}</button>)}</div></section> : <>
+              <div className="search-meta"><strong>{searchResults.length}</strong> ünite bulundu</div>
+              <div className="search-results">{searchResults.map(({ course, unit, unitNumber }) => <button key={unit.id} className="search-result" onClick={() => openUnit(course, unit)} style={{ "--course-color": course.color } as React.CSSProperties}>
+                <span className="search-result-number">{String(unitNumber).padStart(2, "0")}</span>
+                <span className="search-result-copy"><small>{course.code} · {course.short}</small><strong>{unit.title}</strong><p>{unit.summary}</p><span>{[...unit.keywords, ...examGuides[unit.id].signals].slice(0, 4).map((keyword, index) => <em key={`${keyword}-${index}`}>{keyword}</em>)}</span></span>
+                <span className="search-result-arrow">→</span>
+              </button>)}</div>
+              {!searchResults.length && <div className="empty-large"><span>⌕</span><h2>Sonuç bulunamadı</h2><p>Yazımı sadeleştirerek veya daha genel bir kavramla yeniden ara.</p></div>}
+            </>}
           </div>
         )}
 
@@ -247,7 +319,7 @@ export default function Home() {
                     {course.units.map((unit, index) => {
                       const completed = store.completed.includes(unit.id);
                       return <article className={completed ? "progress-unit done" : "progress-unit"} key={unit.id}>
-                        <button className="progress-unit-open" onClick={() => { openCourse(course); setSelectedUnit(unit); }}>
+                        <button className="progress-unit-open" onClick={() => openUnit(course, unit)}>
                           <small>ÜNİTE {String(index + 1).padStart(2, "0")}</small>
                           <strong>{unit.title}</strong>
                           <span>{completed ? "Tamamlandı" : "Konuya git"} →</span>
@@ -274,7 +346,7 @@ export default function Home() {
                 <div className="unit-grid">
                   {selectedCourse.units.map((unit, index) => {
                     const done = store.completed.includes(unit.id);
-                    return <article key={unit.id} className={done ? "done" : ""} onClick={() => setSelectedUnit(unit)}>
+                    return <article key={unit.id} className={done ? "done" : ""} onClick={() => openUnit(selectedCourse, unit)}>
                       <div className="unit-top"><span style={{ color: selectedCourse.color }}>ÜNİTE {String(index + 1).padStart(2, "0")}</span><button onClick={(event) => { event.stopPropagation(); toggleUnit(unit.id); }} aria-label={done ? "Tamamlanmadı işaretle" : "Tamamlandı işaretle"}>{done ? "✓" : ""}</button></div>
                       <h2>{unit.title}</h2><p>{unit.summary}</p><div className="tag-row">{examGuides[unit.id].signals.slice(0, 3).map((keyword) => <span key={keyword}>{keyword}</span>)}</div><em>Çıkmış soru odaklı anlatımı aç →</em>
                     </article>;
@@ -282,7 +354,7 @@ export default function Home() {
                 </div>
               </>
             ) : (
-              <UnitStudy course={selectedCourse} unit={selectedUnit} completed={store.completed.includes(selectedUnit.id)} onToggle={() => toggleUnit(selectedUnit.id)} onQuiz={(unitNumber) => startQuiz(selectedCourse.code, false, unitNumber)} onCourseQuiz={() => startQuiz(selectedCourse.code)} />
+              <UnitStudy course={selectedCourse} unit={selectedUnit} completed={store.completed.includes(selectedUnit.id)} onToggle={() => toggleUnit(selectedUnit.id)} onQuiz={(unitNumber) => startQuiz(selectedCourse.code, false, unitNumber)} onCourseQuiz={() => startQuiz(selectedCourse.code)} onPrevious={selectedCourse.units.indexOf(selectedUnit) > 0 ? () => openUnit(selectedCourse, selectedCourse.units[selectedCourse.units.indexOf(selectedUnit) - 1]) : undefined} onNext={selectedCourse.units.indexOf(selectedUnit) < selectedCourse.units.length - 1 ? () => openUnit(selectedCourse, selectedCourse.units[selectedCourse.units.indexOf(selectedUnit) + 1]) : undefined} />
             )}
           </div>
         )}
@@ -363,7 +435,7 @@ export default function Home() {
   );
 }
 
-function UnitStudy({ course, unit, completed, onToggle, onQuiz, onCourseQuiz }: { course: Course; unit: Unit; completed: boolean; onToggle: () => void; onQuiz: (unitNumber: number) => void; onCourseQuiz: () => void }) {
+function UnitStudy({ course, unit, completed, onToggle, onQuiz, onCourseQuiz, onPrevious, onNext }: { course: Course; unit: Unit; completed: boolean; onToggle: () => void; onQuiz: (unitNumber: number) => void; onCourseQuiz: () => void; onPrevious?: () => void; onNext?: () => void }) {
   const unitNumber = course.units.indexOf(unit) + 1;
   const guide = examGuides[unit.id];
   const deepDive = historyDeepDives[unit.id];
@@ -385,6 +457,7 @@ function UnitStudy({ course, unit, completed, onToggle, onQuiz, onCourseQuiz }: 
       <section className="lesson-copy"><h2>Konuyu anlayarak öğren</h2>{guide.lesson.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}{deepDive && <div className="deep-dive-sections">{deepDive.map((section, index) => <section key={section.title}><span>{String(index + 1).padStart(2, "0")}</span><div><h3>{section.title}</h3><p>{section.body}</p></div></section>)}</div>}</section>
       <section><h2>Kavram kartları</h2><div className="flash-grid">{unit.keywords.map((keyword) => <div key={keyword}><span>KAVRAM</span><strong>{keyword}</strong><small>Kendi cümlenle açıklamayı dene.</small></div>)}</div></section>
       <div className="source-note"><strong>10 Ağustos 2026 tarihinde doğrulandı</strong><p>{course.verification} Soru eğilimleri {course.archivePeriods} dönemlerinden çıkarıldı. Açık arşiv resmî değildir; kesin metin ve cevap anahtarı için eKampüs esas alınır.</p><div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}<a href={course.archiveSource} target="_blank" rel="noreferrer">İncelenen soru arşivi ↗</a></div></div>
+      <nav className="unit-navigator" aria-label="Üniteler arasında geçiş"><button onClick={onPrevious} disabled={!onPrevious}>← Önceki ünite</button><span>Ünite {unitNumber} / {course.units.length}</span><button onClick={onNext} disabled={!onNext}>Sonraki ünite →</button></nav>
     </article>
     <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className="ghost" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Bu üniteden soru çöz" : "Bu dersten soru çöz"}</button><small>İpucu: Hızlı özeti kapatıp üç kritik noktayı sesli anlatabiliyorsan üniteyi tamamla.</small></aside>
   </div>;
