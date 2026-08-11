@@ -37,3 +37,15 @@ with check (
   user_id = auth.uid()
   and public.can_join_room(room_id)
 );
+
+drop policy if exists "players_select"
+on public.players;
+
+create policy "players_select"
+on public.players
+for select
+to authenticated
+using (
+  user_id = auth.uid()
+  or public.is_room_member(room_id)
+);

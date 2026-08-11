@@ -169,8 +169,10 @@ export default function LiveDuel() {
       }
 
       if (!createdRoom) throw new Error("Oda kodu üretilemedi. Tekrar dene.");
-      const { data: player, error: playerError } = await supabase.from("players").insert({ room_id: createdRoom.id, user_id: userId, nickname: cleanName }).select("*").single();
+      const { error: playerError } = await supabase.from("players").insert({ room_id: createdRoom.id, user_id: userId, nickname: cleanName });
       if (playerError) throw playerError;
+      const { data: player, error: playerReadError } = await supabase.from("players").select("*").eq("room_id", createdRoom.id).eq("user_id", userId).single();
+      if (playerReadError) throw playerReadError;
       setPlayers([player as Player]);
       setAnswers([]);
       setRoom(createdRoom);
@@ -193,9 +195,11 @@ export default function LiveDuel() {
       if (roomError) throw roomError;
       if (!foundRoom) throw new Error("Açık bir oda bulunamadı. Kodu kontrol et.");
 
-      const { data: player, error: playerError } = await supabase.from("players").insert({ room_id: foundRoom.id, user_id: userId, nickname: cleanName }).select("*").single();
+      const { error: playerError } = await supabase.from("players").insert({ room_id: foundRoom.id, user_id: userId, nickname: cleanName });
       if (playerError?.code === "23505") throw new Error("Bu tarayıcı zaten odaya katılmış.");
       if (playerError) throw playerError;
+      const { data: player, error: playerReadError } = await supabase.from("players").select("*").eq("room_id", foundRoom.id).eq("user_id", userId).single();
+      if (playerReadError) throw playerReadError;
       setPlayers([player as Player]);
       setAnswers([]);
       setRoom(foundRoom as Room);
