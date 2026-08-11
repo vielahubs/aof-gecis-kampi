@@ -2,6 +2,19 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.9.0 - 2026-08-11
+
+### Eklendi
+
+- Üniteleri yıldızlayarak sınav öncesi tekrar listesine ekleme.
+- Her üniteye 1200 karaktere kadar kişisel çalışma notu yazma ve otomatik kaydetme.
+- Yıldızlanan ve not eklenen üniteleri tek ekranda birleştiren Tekrar Panosu.
+
+### İyileştirildi
+
+- Önceki sürümlerde kaydedilmiş ilerleme ve yanlış verilerini koruyan güvenli yerel veri geçişi.
+- Tekrar listesi, not alanı ve mobil menü için açık/karanlık tema uyumu.
+
 ## v0.8.0 - 2026-08-11
 
 ### Eklendi

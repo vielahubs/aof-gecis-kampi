@@ -2,7 +2,7 @@
 
 22 Ağustos 2026 AÖF yaz okulu sınavları için hazırlanmış, tarayıcıda çalışan çalışma takip uygulaması.
 
-Güncel sürüm: **v0.8.0** · [Değişiklik günlüğü](CHANGELOG.md)
+Güncel sürüm: **v0.9.0** · [Değişiklik günlüğü](CHANGELOG.md)
 
 ## Özellikler
 
@@ -13,6 +13,8 @@ Güncel sürüm: **v0.8.0** · [Değişiklik günlüğü](CHANGELOG.md)
 - Özetler, kritik bilgiler ve ayrıntılı anlatımların tamamında içerik araması
 - Son açılan üniteyi hatırlayan “kaldığın yerden devam et” akışı
 - Konu anlatımında önceki ve sonraki üniteye doğrudan geçiş
+- Zorlanılan üniteleri kaydetmek için kişisel tekrar panosu
+- Her üniteye eklenebilen ve cihazda otomatik saklanan kişisel notlar
 - Her ünitenin başında sınavlık “Bu üniteden mutlaka bil” özeti
 - Beş dersin 40 ünitesi için ayrıntılı sınav anlatımları
 - Açık ve karanlık görünüm seçeneği

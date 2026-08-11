@@ -5,16 +5,18 @@ import { Course, Question, Unit, courses, questions } from "./study-data";
 import { examGuides } from "./exam-guides";
 import { historyDeepDives } from "./history-deep-dives";
 
-type View = "dashboard" | "search" | "progress" | "course" | "quiz" | "mistakes" | "sources";
+type View = "dashboard" | "search" | "review" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
 type StoredState = {
   completed: string[];
   mistakes: string[];
   answered: number;
   correct: number;
+  bookmarks: string[];
+  notes: Record<string, string>;
 };
 
-const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0 };
+const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {} };
 const lastUnitStorageKey = "aof-gecis-kampi-last-unit";
 
 function normalizeSearch(value: string) {
@@ -52,7 +54,18 @@ export default function Home() {
     const timer = window.setTimeout(() => {
       const saved = window.localStorage.getItem("aof-gecis-kampi-v1");
       if (saved) {
-        try { setStore(JSON.parse(saved)); } catch { setStore(initialStore); }
+        try {
+          const parsed = JSON.parse(saved) as Partial<StoredState>;
+          const parsedNotes = parsed.notes && typeof parsed.notes === "object" ? Object.fromEntries(Object.entries(parsed.notes).filter((entry): entry is [string, string] => typeof entry[1] === "string")) : {};
+          setStore({
+            completed: Array.isArray(parsed.completed) ? parsed.completed : [],
+            mistakes: Array.isArray(parsed.mistakes) ? parsed.mistakes : [],
+            answered: typeof parsed.answered === "number" ? parsed.answered : 0,
+            correct: typeof parsed.correct === "number" ? parsed.correct : 0,
+            bookmarks: Array.isArray(parsed.bookmarks) ? parsed.bookmarks : [],
+            notes: parsedNotes,
+          });
+        } catch { setStore(initialStore); }
       }
       const savedTheme = window.localStorage.getItem("aof-gecis-kampi-theme");
       const preferredTheme: Theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -114,6 +127,8 @@ export default function Home() {
     })).filter((result) => result.matches);
   }, [searchQuery]);
 
+  const reviewUnits = useMemo(() => courses.flatMap((course) => course.units.map((unit, index) => ({ course, unit, unitNumber: index + 1 }))).filter(({ unit }) => store.bookmarks.includes(unit.id) || Boolean(store.notes[unit.id]?.trim())), [store.bookmarks, store.notes]);
+
   function openCourse(course: Course) {
     setSelectedCourse(course);
     setSelectedUnit(null);
@@ -132,6 +147,17 @@ export default function Home() {
       ...prev,
       completed: prev.completed.includes(id) ? prev.completed.filter((item) => item !== id) : [...prev.completed, id],
     }));
+  }
+
+  function toggleBookmark(id: string) {
+    setStore((prev) => ({
+      ...prev,
+      bookmarks: prev.bookmarks.includes(id) ? prev.bookmarks.filter((item) => item !== id) : [...prev.bookmarks, id],
+    }));
+  }
+
+  function updateNote(id: string, note: string) {
+    setStore((prev) => ({ ...prev, notes: { ...prev.notes, [id]: note } }));
   }
 
   function startQuiz(courseCode?: string, mistakeOnly = false, unitNumber?: number) {
@@ -190,6 +216,7 @@ export default function Home() {
         <nav className="main-nav" aria-label="Ana menü">
           <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><span>⌂</span> Genel Bakış</button>
           <button className={view === "search" ? "active" : ""} onClick={() => setView("search")}><span>⌕</span> İçerikte Ara</button>
+          <button className={view === "review" ? "active" : ""} onClick={() => setView("review")}><span>★</span> Tekrar Panosu <em>{reviewUnits.length}</em></button>
           <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")}><span>▦</span> İlerleme Haritası</button>
           <button className={view === "mistakes" ? "active" : ""} onClick={() => setView("mistakes")}><span>↺</span> Yanlışlarım <em>{store.mistakes.length}</em></button>
           <button onClick={() => startQuiz()}><span>▶</span> Karışık Deneme</button>
@@ -297,6 +324,29 @@ export default function Home() {
           </div>
         )}
 
+        {view === "review" && (
+          <div className="page review-page">
+            <p className="eyebrow">KİŞİSEL ÇALIŞMA ALANI</p>
+            <h1>Tekrar Panosu</h1>
+            <p className="lead">Zorlandığın üniteleri yıldızla, kendi notlarını ekle ve sınav öncesi tekrar edeceğin her şeyi burada topla.</p>
+            <section className="review-summary">
+              <article><span>★</span><div><strong>{store.bookmarks.length}</strong><small>tekrar ünitesi</small></div></article>
+              <article><span>✎</span><div><strong>{Object.values(store.notes).filter((note) => note.trim()).length}</strong><small>kişisel not</small></div></article>
+              <button className="primary" onClick={() => setView("progress")}>Haritadan ünite seç →</button>
+            </section>
+            {reviewUnits.length ? <div className="review-grid">{reviewUnits.map(({ course, unit, unitNumber }) => {
+              const bookmarked = store.bookmarks.includes(unit.id);
+              const note = store.notes[unit.id]?.trim();
+              return <article key={unit.id} className="review-card" style={{ "--course-color": course.color } as React.CSSProperties}>
+                <header><span>{course.code} · ÜNİTE {unitNumber}</span><button onClick={() => toggleBookmark(unit.id)} aria-label={bookmarked ? "Tekrar listesinden çıkar" : "Tekrar listesine ekle"}>{bookmarked ? "★" : "☆"}</button></header>
+                <h2>{unit.title}</h2>
+                {note ? <blockquote>{note}</blockquote> : <p>Bu ünite tekrar listende; kişisel not eklemek için anlatımı aç.</p>}
+                <button className="review-open" onClick={() => openUnit(course, unit)}>Üniteyi aç →</button>
+              </article>;
+            })}</div> : <div className="empty-large"><span>★</span><h2>Tekrar panon boş</h2><p>Bir ünitenin anlatımını açıp “Tekrar listeme ekle” düğmesine bas veya kişisel not yaz.</p><button className="primary" onClick={() => setView("progress")}>Üniteleri incele</button></div>}
+          </div>
+        )}
+
         {view === "progress" && (
           <div className="page progress-page">
             <section className="progress-heading">
@@ -354,7 +404,7 @@ export default function Home() {
                 </div>
               </>
             ) : (
-              <UnitStudy course={selectedCourse} unit={selectedUnit} completed={store.completed.includes(selectedUnit.id)} onToggle={() => toggleUnit(selectedUnit.id)} onQuiz={(unitNumber) => startQuiz(selectedCourse.code, false, unitNumber)} onCourseQuiz={() => startQuiz(selectedCourse.code)} onPrevious={selectedCourse.units.indexOf(selectedUnit) > 0 ? () => openUnit(selectedCourse, selectedCourse.units[selectedCourse.units.indexOf(selectedUnit) - 1]) : undefined} onNext={selectedCourse.units.indexOf(selectedUnit) < selectedCourse.units.length - 1 ? () => openUnit(selectedCourse, selectedCourse.units[selectedCourse.units.indexOf(selectedUnit) + 1]) : undefined} />
+              <UnitStudy course={selectedCourse} unit={selectedUnit} completed={store.completed.includes(selectedUnit.id)} bookmarked={store.bookmarks.includes(selectedUnit.id)} note={store.notes[selectedUnit.id] ?? ""} onToggle={() => toggleUnit(selectedUnit.id)} onBookmark={() => toggleBookmark(selectedUnit.id)} onNote={(note) => updateNote(selectedUnit.id, note)} onQuiz={(unitNumber) => startQuiz(selectedCourse.code, false, unitNumber)} onCourseQuiz={() => startQuiz(selectedCourse.code)} onPrevious={selectedCourse.units.indexOf(selectedUnit) > 0 ? () => openUnit(selectedCourse, selectedCourse.units[selectedCourse.units.indexOf(selectedUnit) - 1]) : undefined} onNext={selectedCourse.units.indexOf(selectedUnit) < selectedCourse.units.length - 1 ? () => openUnit(selectedCourse, selectedCourse.units[selectedCourse.units.indexOf(selectedUnit) + 1]) : undefined} />
             )}
           </div>
         )}
@@ -435,7 +485,7 @@ export default function Home() {
   );
 }
 
-function UnitStudy({ course, unit, completed, onToggle, onQuiz, onCourseQuiz, onPrevious, onNext }: { course: Course; unit: Unit; completed: boolean; onToggle: () => void; onQuiz: (unitNumber: number) => void; onCourseQuiz: () => void; onPrevious?: () => void; onNext?: () => void }) {
+function UnitStudy({ course, unit, completed, bookmarked, note, onToggle, onBookmark, onNote, onQuiz, onCourseQuiz, onPrevious, onNext }: { course: Course; unit: Unit; completed: boolean; bookmarked: boolean; note: string; onToggle: () => void; onBookmark: () => void; onNote: (note: string) => void; onQuiz: (unitNumber: number) => void; onCourseQuiz: () => void; onPrevious?: () => void; onNext?: () => void }) {
   const unitNumber = course.units.indexOf(unit) + 1;
   const guide = examGuides[unit.id];
   const deepDive = historyDeepDives[unit.id];
@@ -456,9 +506,10 @@ function UnitStudy({ course, unit, completed, onToggle, onQuiz, onCourseQuiz, on
       <div className="exam-evidence"><span>ÇIKMIŞ SORU ANALİZİ</span><strong>3 yaz okulu • 60 soru / ders</strong><p>Bu ünitenin anlatımı, sorularda görülen kavram ve çeldirici kalıplarına göre genişletildi.</p></div>
       <section className="lesson-copy"><h2>Konuyu anlayarak öğren</h2>{guide.lesson.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}{deepDive && <div className="deep-dive-sections">{deepDive.map((section, index) => <section key={section.title}><span>{String(index + 1).padStart(2, "0")}</span><div><h3>{section.title}</h3><p>{section.body}</p></div></section>)}</div>}</section>
       <section><h2>Kavram kartları</h2><div className="flash-grid">{unit.keywords.map((keyword) => <div key={keyword}><span>KAVRAM</span><strong>{keyword}</strong><small>Kendi cümlenle açıklamayı dene.</small></div>)}</div></section>
+      <section className="personal-notes"><header><div><span>KİŞİSEL NOT</span><h2>Bu üniteden aklında kalsın</h2></div><small>{note.length}/1200</small></header><textarea value={note} onChange={(event) => onNote(event.target.value)} maxLength={1200} placeholder="Örneğin: Birbirine karıştırdığım kavramlar, ezberlemem gereken tarih veya sınavdan önce tekrar bakacağım nokta..." aria-label={`${unit.title} için kişisel not`} /><p>Notun otomatik kaydedilir ve yalnızca bu cihazda saklanır.</p></section>
       <div className="source-note"><strong>10 Ağustos 2026 tarihinde doğrulandı</strong><p>{course.verification} Soru eğilimleri {course.archivePeriods} dönemlerinden çıkarıldı. Açık arşiv resmî değildir; kesin metin ve cevap anahtarı için eKampüs esas alınır.</p><div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}<a href={course.archiveSource} target="_blank" rel="noreferrer">İncelenen soru arşivi ↗</a></div></div>
       <nav className="unit-navigator" aria-label="Üniteler arasında geçiş"><button onClick={onPrevious} disabled={!onPrevious}>← Önceki ünite</button><span>Ünite {unitNumber} / {course.units.length}</span><button onClick={onNext} disabled={!onNext}>Sonraki ünite →</button></nav>
     </article>
-    <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className="ghost" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Bu üniteden soru çöz" : "Bu dersten soru çöz"}</button><small>İpucu: Hızlı özeti kapatıp üç kritik noktayı sesli anlatabiliyorsan üniteyi tamamla.</small></aside>
+    <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className={bookmarked ? "ghost saved" : "ghost"} onClick={onBookmark}>{bookmarked ? "★ Tekrar listemde" : "☆ Tekrar listeme ekle"}</button><button className="ghost" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Bu üniteden soru çöz" : "Bu dersten soru çöz"}</button><small>İpucu: Hızlı özeti kapatıp üç kritik noktayı sesli anlatabiliyorsan üniteyi tamamla.</small></aside>
   </div>;
 }
