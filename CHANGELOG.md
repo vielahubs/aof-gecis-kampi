@@ -18,6 +18,11 @@ Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedili
 - Yarışma tablolarına kullanıcı ve oda üyeliği temelli satır güvenliği uygulandı.
 - GitHub Pages sürümüne Supabase istemci bağlantısı eklendi.
 
+### Düzeltildi
+
+- Oyuncuların bekleme odasına katılmasını engelleyen iç içe RLS kontrolü, güvenli oda uygunluk fonksiyonuyla değiştirildi.
+- Bir yarışma odası en fazla iki oyuncu kabul edecek biçimde veritabanı seviyesinde sınırlandı.
+
 ## v0.10.0 - 2026-08-11
 
 ### Eklendi
