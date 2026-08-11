@@ -2,6 +2,22 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.11.0 - 2026-08-11
+
+### Eklendi
+
+- Oda koduyla arkadaş davet etmeyi sağlayan iki kişilik Canlı Düello.
+- Hesap açmadan kullanılan anonim oyuncu oturumları ve hazır odası.
+- İki oyuncuya aynı sırayla yöneltilen 10 soruluk yarışma akışı.
+- Doğru cevap ve ilk 20 saniyedeki cevap hızını birlikte değerlendiren puanlama.
+- Her soruda anlık cevap durumu, canlı skor tablosu ve final sıralaması.
+
+### Altyapı
+
+- Yarışma odaları, oyuncular ve cevaplar Supabase Realtime ile eşzamanlandı.
+- Yarışma tablolarına kullanıcı ve oda üyeliği temelli satır güvenliği uygulandı.
+- GitHub Pages sürümüne Supabase istemci bağlantısı eklendi.
+
 ## v0.10.0 - 2026-08-11
 
 ### Eklendi

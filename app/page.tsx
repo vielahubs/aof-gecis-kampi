@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Course, Question, Unit, courses, questions } from "./study-data";
 import { examGuides } from "./exam-guides";
 import { historyDeepDives } from "./history-deep-dives";
+import LiveDuel from "./live-duel";
 
-type View = "dashboard" | "search" | "review" | "focus" | "progress" | "course" | "quiz" | "mistakes" | "sources";
+type View = "dashboard" | "duel" | "search" | "review" | "focus" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
 type StoredState = {
   completed: string[];
@@ -258,6 +259,7 @@ export default function Home() {
 
         <nav className="main-nav" aria-label="Ana menü">
           <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><span>⌂</span> Genel Bakış</button>
+          <button className={view === "duel" ? "active" : ""} onClick={() => setView("duel")}><span>⚔</span> Canlı Düello</button>
           <button className={view === "search" ? "active" : ""} onClick={() => setView("search")}><span>⌕</span> İçerikte Ara</button>
           <button className={view === "review" ? "active" : ""} onClick={() => setView("review")}><span>★</span> Tekrar Panosu <em>{reviewUnits.length}</em></button>
           <button className={view === "focus" ? "active" : ""} onClick={() => setView("focus")}><span>◷</span> Odak Sayacı</button>
@@ -299,7 +301,7 @@ export default function Home() {
                 <p className="eyebrow">YAZ OKULU • 5 DERS • 40 ÜNİTE</p>
                 <h1>Geçmek için ne çalışacağını<br />her gün netleştir.</h1>
                 <p>Bütün üniteler kapsamda. 300 yaz okulu sorusu tarandı; tekrar eden kavramlar konu anlatımlarına ve sınav tuzaklarına dönüştürüldü.</p>
-                <div className="hero-actions"><button className="primary" onClick={() => lastUnit ? openUnit(lastUnit.course, lastUnit.unit) : todaysUnits[0] && openUnit(todaysUnits[0].course, todaysUnits[0].unit)}>{lastUnit ? "Kaldığın yerden devam et" : "Bugünün planına başla"} <span>→</span></button><button className="ghost" onClick={() => startQuiz()}>Seviye denemesi</button><button className="ghost" onClick={() => setView("sources")}>Kaynakları gör</button></div>
+                <div className="hero-actions"><button className="primary" onClick={() => lastUnit ? openUnit(lastUnit.course, lastUnit.unit) : todaysUnits[0] && openUnit(todaysUnits[0].course, todaysUnits[0].unit)}>{lastUnit ? "Kaldığın yerden devam et" : "Bugünün planına başla"} <span>→</span></button><button className="ghost" onClick={() => setView("duel")}>Arkadaşınla yarış</button><button className="ghost" onClick={() => startQuiz()}>Seviye denemesi</button></div>
               </div>
               <div className="countdown-card">
                 <span>Sınava kalan</span>
@@ -345,6 +347,8 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {view === "duel" && <LiveDuel />}
 
         {view === "search" && (
           <div className="page search-page">

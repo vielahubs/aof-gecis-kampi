@@ -2,12 +2,14 @@
 
 22 Ağustos 2026 AÖF yaz okulu sınavları için hazırlanmış, tarayıcıda çalışan çalışma takip uygulaması.
 
-Güncel sürüm: **v0.10.0** · [Değişiklik günlüğü](CHANGELOG.md)
+Güncel sürüm: **v0.11.0** · [Değişiklik günlüğü](CHANGELOG.md)
 
 ## Özellikler
 
 - Beş ders ve toplam 40 ünite için çalışma takibi
 - Ders bazında ve karışık özgün denemeler
+- Oda koduyla çalışan, iki kişilik gerçek zamanlı Canlı Düello
+- Ortak 10 soru, hazır odası, hız puanı ve canlı skor tablosu
 - Yanlış soruları otomatik tekrar listesine ekleme
 - Beş dersin 40 ünitesini gösteren ayrı ilerleme haritası
 - Özetler, kritik bilgiler ve ayrıntılı anlatımların tamamında içerik araması
@@ -21,7 +23,7 @@ Güncel sürüm: **v0.10.0** · [Değişiklik günlüğü](CHANGELOG.md)
 - Beş dersin 40 ünitesi için ayrıntılı sınav anlatımları
 - Açık ve karanlık görünüm seçeneği
 - Resmî Anadolu Üniversitesi kaynak bağlantıları
-- İlerlemeyi yalnızca kullanıcının tarayıcısında saklama
+- Kişisel ilerlemeyi tarayıcıda, geçici yarışma verilerini güvenli Supabase tablolarında saklama
 
 ## Yerel çalıştırma
 
