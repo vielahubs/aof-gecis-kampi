@@ -331,7 +331,7 @@ export default function Home() {
                 <li><span>3</span><p>Yaz okulu kapsamı, 2025–2026 resmî kayıt kılavuzunun “Sınavda ilgili derse ait ünitelerin tamamından sorumludur” hükmüyle doğrulandı.</p></li>
                 <li><span>4</span><p>Beş ders için üçer yaz okulu sınavındaki 300 soru görseli indirildi; 290 soru OCR ile okunup örneklem bütünlüğü kontrol edildi.</p></li>
                 <li><span>5</span><p>Aynı kavramın farklı yazımları tek başlıkta birleştirildi; tekrar eden soru kalıpları, karıştırılan seçenekler ve anahtar kelimeler ünitelere eşlendi.</p></li>
-                <li><span>6</span><p>Açık arşiv Anadolu Üniversitesi'nin resmî sistemi değildir. Kesin soru metni ve cevap anahtarı için eKampüs esas alınmalıdır; burada soru metinleri kopyalanmadan analiz sonucu kullanılır.</p></li>
+                <li><span>6</span><p>Açık arşiv Anadolu Üniversitesi&apos;nin resmî sistemi değildir. Kesin soru metni ve cevap anahtarı için eKampüs esas alınmalıdır; burada soru metinleri kopyalanmadan analiz sonucu kullanılır.</p></li>
               </ol>
               <div className="official-links"><a href="https://www.anadolu.edu.tr/acikogretim/ogrenme-ortamlari/kitap-hizmetleri" target="_blank" rel="noreferrer">Güncel PDF’nin esas olduğunu açıklayan Kitap Hizmetleri ↗</a><a href="https://www.anadolu.edu.tr/acikogretim/sinavlar-ve-sorumluluk-uniteleri/sinav-tarihleri" target="_blank" rel="noreferrer">22 Ağustos sınav tarihi ↗</a><a href="https://www.anadolu.edu.tr/acikogretim/sinavlar-ve-sorumluluk-uniteleri/sinavyayinlamasistemi" target="_blank" rel="noreferrer">Resmî çıkmış sorular: eKampüs ↗</a></div>
             </section>
