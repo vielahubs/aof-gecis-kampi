@@ -2,11 +2,16 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v1.1.0 - 2026-08-13
+
+### İyileştirildi
+
+- Genel Bakış sayfasında dersler geniş sol alana, günlük çalışma planı daha küçük sağ alana taşındı.
+
 ## v1.0.0 - 2026-08-13
 
 ### Kararlı sürüm
 
-- Projenin ilk kararlı sürümü olarak sürüm dizisi v1.0.0'a geçirildi. Sonraki özellik sürümleri v1.1.0, v1.2.0; hata düzeltmeleri v1.0.1 biçiminde ilerleyecek.
 - Beş ders, 40 ünite, 40 ayrıntılı anlatım, 120 tekrar kartı ve bütün çalışma akışları veri bütünlüğü testleriyle doğrulandı.
 - Soru havuzu her derste 10 soru olacak biçimde 50 soruya tamamlandı; daha önce sorusu bulunmayan beş üniteye de doğrudan soru desteği eklendi.
 - Denemelerin süre dolmasıyla manuel bitirmenin aynı anda gerçekleşmesi durumunda geçmişe iki kez kaydolmasını önleyen tek sonuçlandırma kilidi eklendi.

@@ -339,7 +339,7 @@ export default function LiveDuel() {
 
   if (!room) {
     return <div className="page duel-page">
-      <p className="eyebrow">V1.0 • GERÇEK ZAMANLI</p>
+      <p className="eyebrow">V1.1 • GERÇEK ZAMANLI</p>
       <h1>Canlı Düello</h1>
       <p className="lead">Arkadaşını odaya çağır, aynı 10 soruyu çöz ve hem bilgi hem hız puanıyla yarış.</p>
       <div className="duel-intro">

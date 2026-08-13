@@ -912,7 +912,7 @@ export default function Home() {
       <aside className="sidebar">
         <button className="brand" onClick={() => setView("dashboard")} aria-label="Ana sayfa">
           <span className="brand-mark">A</span>
-          <span><strong>AÖF Kampı</strong><small>v1.0 · 22 Ağustos 2026</small></span>
+          <span><strong>AÖF Kampı</strong><small>v1.1 · 22 Ağustos 2026</small></span>
         </button>
 
         <nav className="main-nav" aria-label="Ana menü">
@@ -970,6 +970,16 @@ export default function Home() {
             </section>
 
             <div className="dashboard-grid">
+              <section className="panel courses-panel">
+                <div className="panel-heading"><div><p className="eyebrow">DERSLER</p><h2>Hızlı ders geçişi</h2></div><button className="panel-link" onClick={() => setView("progress")}>Haritayı aç →</button></div>
+                <div className="course-cards">
+                  {courses.map((course) => {
+                    const done = course.units.filter((unit) => store.completed.includes(unit.id)).length;
+                    return <button key={course.code} onClick={() => openCourse(course)}><span className="course-icon" style={{ background: `${course.color}1c`, color: course.color }}>{course.short.slice(0, 2).toUpperCase()}</span><span><small>{course.code}</small><strong>{course.title}</strong><i><b style={{ width: `${done * 12.5}%`, background: course.color }} /></i></span><em>{done}/8</em></button>;
+                  })}
+                </div>
+              </section>
+
               <section className="panel today-panel">
                 <div className="panel-heading"><div><p className="eyebrow">BUGÜN</p><h2>Çalışma planın</h2></div><button className="panel-link" onClick={() => setView("daily-plan")}>{currentPlan ? "Planı aç →" : "Plan oluştur →"}</button></div>
                 <div className="task-list">
@@ -983,16 +993,6 @@ export default function Home() {
                       <span className="task-arrow">→</span>
                     </button>;
                   }) : <div className="empty-state"><strong>Bugünkü rotanı oluştur</strong><p>Ayırabileceğin süreye göre ünite, tekrar ve deneme görevleri otomatik seçilir.</p><button className="primary" onClick={() => setView("daily-plan")}>Planı hazırla</button></div>}
-                </div>
-              </section>
-
-              <section className="panel courses-panel">
-                <div className="panel-heading"><div><p className="eyebrow">DERSLER</p><h2>Hızlı ders geçişi</h2></div><button className="panel-link" onClick={() => setView("progress")}>Haritayı aç →</button></div>
-                <div className="course-cards">
-                  {courses.map((course) => {
-                    const done = course.units.filter((unit) => store.completed.includes(unit.id)).length;
-                    return <button key={course.code} onClick={() => openCourse(course)}><span className="course-icon" style={{ background: `${course.color}1c`, color: course.color }}>{course.short.slice(0, 2).toUpperCase()}</span><span><small>{course.code}</small><strong>{course.title}</strong><i><b style={{ width: `${done * 12.5}%`, background: course.color }} /></i></span><em>{done}/8</em></button>;
-                  })}
                 </div>
               </section>
             </div>
