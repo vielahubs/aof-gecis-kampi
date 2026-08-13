@@ -1319,7 +1319,7 @@ export default function Home() {
                     })}
                   </div>
                   {picked !== null && <div className={picked === currentQuestion.answer ? "feedback correct" : "feedback wrong"}><strong>{picked === currentQuestion.answer ? "Doğru cevap" : `Doğru cevap: ${String.fromCharCode(65 + currentQuestion.answer)}`}</strong><p>{currentQuestion.explanation}</p></div>}
-                  <div className="question-actions"><span>{picked === null ? "Boş geçebilir veya soruyu işaretleyip sonra dönebilirsin." : "Cevabın kaydedildi; paletten başka soruya dönebilirsin."}</span><button className="primary" onClick={nextQuestion}>{quizIndex === quiz.length - 1 ? "Başa dön" : picked === null ? "Boş geç" : "Sonraki soru"} →</button></div>
+                  <div className="question-actions"><span>{picked === null ? "Boş geçebilir veya soruyu işaretleyip sonra dönebilirsin." : "Cevabın kaydedildi; paletten başka soruya dönebilirsin."}</span><div className="question-action-buttons"><button className="ghost" onClick={leaveQuiz}>× Denemeden çık</button><button className="primary" onClick={nextQuestion}>{quizIndex === quiz.length - 1 ? "Başa dön" : picked === null ? "Boş geç" : "Sonraki soru"} →</button></div></div>
                 </section>
                 <aside className="quiz-palette">
                   <header><div><span>SORU PALETİ</span><strong>{Object.keys(quizPicks).length}/{quiz.length} cevaplandı</strong></div><small>⚑ {quizFlags.length}</small></header>

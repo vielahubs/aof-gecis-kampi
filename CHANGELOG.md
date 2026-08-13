@@ -2,6 +2,12 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v1.2.1 - 2026-08-13
+
+### İyileştirildi
+
+- Deneme ekranının altındaki “Başa dön / Sonraki soru” düğmesinin yanına, sayfanın başına kaydırmadan kullanılabilen “Denemeden çık” düğmesi eklendi.
+
 ## v1.2.0 - 2026-08-13
 
 ### Eklendi
