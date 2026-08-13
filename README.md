@@ -2,7 +2,7 @@
 
 22 Ağustos 2026 AÖF yaz okulu sınavları için hazırlanmış, tarayıcıda çalışan çalışma takip uygulaması.
 
-Güncel sürüm: **v1.1.0** · [Değişiklik günlüğü](CHANGELOG.md)
+Güncel sürüm: **v1.2.0** · [Değişiklik günlüğü](CHANGELOG.md)
 
 ## Özellikler
 
@@ -14,6 +14,7 @@ Güncel sürüm: **v1.1.0** · [Değişiklik günlüğü](CHANGELOG.md)
 - 120 kartlık havuzdan her ders ve üniteden eşit dağıtılan 40 kartlık akıllı tekrar oturumları
 - Doğru, yanlış ve boş cevapları ünite bazında gösteren zayıflık haritası
 - 20 soruluk karma ve ders bazında süreli sınav provaları
+- Denemeler içinde her ders için analiz edilen üç yaz okulunu gösteren çıkmış soru arşivi
 - Denemede işaretleme, boş soruya geri dönme ve cevap durumlarını gösteren soru paleti
 - Sonuç ekranında boş bırakılan soruların doğru cevap ve açıklamalarını inceleme
 - Ünite özetini ve anlatımını Türkçe okuyan, hız ve bölüm kontrollü sesli çalışma modu

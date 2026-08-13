@@ -1074,6 +1074,15 @@ export default function Home() {
               const duration = Math.max(10, Math.ceil(count * 1.5));
               return <article key={course.code} style={{ "--course-color": course.color } as React.CSSProperties}><span>{course.code}</span><h2>{course.title}</h2><p>{count} soru · {duration} dakika</p><button onClick={() => startTimedExam(course.code)}>Ders provasını başlat →</button></article>;
             })}</div>
+            <section className="past-exams">
+              <header><div><span>ÇIKMIŞ SORU ARŞİVİ</span><h2>Yaz okulu çıkmış soruları</h2><p>Her ders için analizde kullanılan son üç yaz okulu sınavını ayrı ayrı gör ve açık arşivden çöz.</p></div><a href="https://www.anadolu.edu.tr/acikogretim/sinavlar-ve-sorumluluk-uniteleri/sinavyayinlamasistemi" target="_blank" rel="noreferrer">Resmî eKampüs ↗</a></header>
+              <div className="past-exam-grid">{courses.map((course) => <article key={course.code} style={{ "--course-color": course.color } as React.CSSProperties}>
+                <div className="past-exam-course"><span>{course.code}</span><h3>{course.title}</h3><small>3 sınav · toplam 60 soru</small></div>
+                <div className="past-exam-years">{course.archiveYears.map((year) => <span key={year}><b>{year}</b><small>Yaz okulu</small></span>)}</div>
+                <a href={course.archiveSource} target="_blank" rel="noreferrer">Çıkmış soruları aç <span>↗</span></a>
+              </article>)}</div>
+              <p className="past-exam-note">Açık arşiv resmî değildir. Soru metni ve cevap anahtarının kesin kontrolü için Anadolu Üniversitesi eKampüs sınav yayımlama sistemi esas alınmalıdır.</p>
+            </section>
             <section className="timed-rules"><strong>Deneme kuralları</strong><div><span>01</span><p>Soru paletinden boş veya işaretli sorulara geri dönebilirsin.</p><span>02</span><p>Boş bırakabilirsin; boşlar neti düşürmez.</p><span>03</span><p>Süre dolunca kalan sorular otomatik boş kaydedilir.</p><span>04</span><p>Sonuçlar zayıflık haritasını günceller.</p></div></section>
           </div>
         )}
@@ -1125,7 +1134,7 @@ export default function Home() {
                 <div className="smart-review-progress"><i style={{ width: `${((reviewCardIndex + 1) / reviewDeck.length) * 100}%` }} /></div>
                 <article className={reviewCardRevealed ? "smart-review-card revealed" : "smart-review-card"} style={{ "--course-color": currentReviewCard.course.color } as React.CSSProperties}>
                   <div className="smart-card-meta"><span>{currentReviewCard.course.short}</span><span>Ünite {currentReviewCard.unitNumber}</span></div>
-                  <small>{reviewCardRevealed ? "KISA CEVAP" : "SINAV KARTI"}</small>
+                  <small>{reviewCardRevealed ? "SINAV NOTU" : "SINAV KARTI"}</small>
                   <h2>{reviewCardRevealed ? currentReviewCard.answer : currentReviewCard.prompt}</h2>
                   {!reviewCardRevealed && <p>Cevabı zihninden söyle, sonra kartı çevir.</p>}
                   <button className="smart-card-flip" onClick={() => setReviewCardRevealed((value) => !value)}>{reviewCardRevealed ? "Soruyu tekrar göster" : "Cevabı göster"} ↻</button>
@@ -1367,7 +1376,7 @@ function UnitStudy({ course, unit, completed, bookmarked, note, audioActive, aud
           <div className="critical-facts"><h3>Kritik bilgiler</h3><ol>{unit.keyPoints.map((point, index) => <li key={point}><span>{index + 1}</span><p>{point}</p></li>)}</ol></div>
           <div className="keyword-box"><h3>Soruda görünce tanı</h3><div>{guide.signals.map((signal) => <span key={signal}>{signal}</span>)}</div><small>Bu ifadeler soru kökünde veya seçeneklerde geçtiğinde ünitenin ilgili kavramını hatırla.</small></div>
         </div>
-        <div className="question-patterns"><h3>Soru kalıpları ve kısa cevapları</h3><div>{guide.patterns.map((pattern, index) => <article key={pattern}><span>{index + 1}</span><div><strong>{pattern}</strong><small><b>CEVAP:</b> {getPatternAnswer(unit.id, index)}</small></div></article>)}</div></div>
+        <div className="question-patterns"><h3>Soru kalıpları ve sınav notları</h3><div>{guide.patterns.map((pattern, index) => <article key={pattern}><span>{index + 1}</span><div><strong>{pattern}</strong><small><b>SINAV NOTU:</b> {getPatternAnswer(unit.id, index)}</small></div></article>)}</div></div>
         <div className="quick-recall"><div><span>⚠ KARIŞTIRMA</span><p>{guide.trap}</p></div><div><span>⏱ 2 DAKİKALIK TEKRAR</span><p>{guide.hook}</p></div></div>
         <div className="unit-check-action"><div><strong>Kendini kontrol et</strong><small>{unitQuestionCount ? `Bu ünite için ${unitQuestionCount} özgün kontrol sorusu hazır.` : "Bu üniteye özel soru henüz yok; ders denemesinden devam edebilirsin."}</small></div><button className="primary" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Ünite sorusunu çöz" : "Ders denemesini aç"} →</button></div>
       </section>

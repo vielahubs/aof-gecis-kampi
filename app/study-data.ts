@@ -15,6 +15,7 @@ export type Course = {
   bookSource?: string;
   archiveSource: string;
   archivePeriods: string;
+  archiveYears: string[];
   verification: string;
   units: Unit[];
 };
@@ -47,6 +48,7 @@ export const courses: Course[] = [
     bookSource: "https://kitapsatis1.anadolu.edu.tr/100019-ataturk-ilkeleri-ve-inkilap-tarihi-i.html",
     archiveSource: "https://aofsoru.com/tar201u-ataturk-ilkeleri-ve-inkilap-tarihi-1-dersi-sinav-sorulari",
     archivePeriods: "2022–2023, 2023–2024 ve 2024–2025 yaz okulu",
+    archiveYears: ["2024–2025", "2023–2024", "2022–2023"],
     verification: "8 ünite başlığı resmî Anadolu ders içeriği ve güncel kitap sayfasıyla doğrulandı.",
     units: [
       u("TAR201U", 1, "Türk İnkılabını Hazırlayan Sebepler: 19. ve 20. Yüzyıllarda Osmanlı Devletine Genel Bakış", "Osmanlı Devleti'nin son dönemindeki askerî, siyasi, ekonomik ve toplumsal sorunlar; reform arayışları ve milliyetçilik hareketleri Türk İnkılabı'nın tarihsel zeminini oluşturdu.", ["Tanzimat Fermanı: 1839", "Islahat Fermanı: 1856", "I. Meşrutiyet ve Kanun-ı Esasi: 1876"], ["Tanzimat", "meşrutiyet", "Kanun-ı Esasi"]),
@@ -68,6 +70,7 @@ export const courses: Course[] = [
     bookSource: "https://kitapsatis1.anadolu.edu.tr/100363-ataturk-ilkeleri-ve-inkilap-tarihi-ii.html",
     archiveSource: "https://aofsoru.com/tar202u-ataturk-ilkeleri-ve-inkilap-tarihi-2-dersi-sinav-sorulari",
     archivePeriods: "2022–2023, 2023–2024 ve 2024–2025 yaz okulu",
+    archiveYears: ["2024–2025", "2023–2024", "2022–2023"],
     verification: "8 ünite başlığı resmî Anadolu ders içeriği ve güncel kitap sayfasıyla doğrulandı.",
     units: [
       u("TAR202U", 1, "Türk İnkılabı ve İnkılap Hareketleri", "Türk İnkılabı'nın siyasal, hukuk, eğitim-kültür, toplumsal ve ekonomik alanlardaki düzenlemeleri yeni devletin çağdaşlaşma sürecini oluşturdu.", ["Saltanat 1 Kasım 1922'de, halifelik 3 Mart 1924'te kaldırıldı", "Tevhid-i Tedrisat eğitimde birliği sağladı", "Medeni Kanun, Harf İnkılabı ve ekonomik düzenlemeler birlikte değerlendirilir"], ["inkılap", "Tevhid-i Tedrisat", "Medeni Kanun", "Harf İnkılabı"]),
@@ -89,6 +92,7 @@ export const courses: Course[] = [
     bookSource: "https://kitapsatis1.anadolu.edu.tr/de/100146-icerik-yonetim-sistemleri.html",
     archiveSource: "https://aofsoru.com/wtk201u-icerik-yonetim-sistemleri-dersi-sinav-sorulari",
     archivePeriods: "2021–2022, 2022–2023 ve 2023–2024 yaz okulu",
+    archiveYears: ["2023–2024", "2022–2023", "2021–2022"],
     verification: "8 ünite başlığı resmî Anadolu ders içeriği ve kitap sayfasıyla doğrulandı.",
     units: [
       u("WTK201U", 1, "İYS'de Temel Kavramlar", "İçerik yönetim sistemi; dijital içeriği oluşturma, düzenleme, depolama, yayınlama ve paylaşma süreçlerini kullanıcı dostu bir arayüzle yönetir. İçerik yönetimi ile içerik sunumu farklı bileşenlerdir.", ["Dijital içerik metin, ses, görüntü ve belge olabilir", "Temel işlevler: kataloglama, format yönetimi, düzeltme takibi, yayınlama", "İYS, içerik yönetim çatısından daha az teknik bilgi ister"], ["İYS", "dijital içerik", "iş akışı", "yayınlama"]),
@@ -110,6 +114,7 @@ export const courses: Course[] = [
     bookSource: "https://kitapsatis1.anadolu.edu.tr/100568-internet-tabanli-programlama.html",
     archiveSource: "https://aofsoru.com/wtk210u-internet-tabanli-programlama-dersi-sinav-sorulari",
     archivePeriods: "2022–2023, 2023–2024 ve 2024–2025 yaz okulu",
+    archiveYears: ["2024–2025", "2023–2024", "2022–2023"],
     verification: "8 ünite başlığı resmî Anadolu ders içeriği ve kitap sayfasıyla doğrulandı.",
     units: [
       u("WTK210U", 1, "İnternet Tabanlı Programlamanın Temelleri", "Web uygulamaları istemci, sunucu, HTTP, tarayıcı, alan adı ve barındırma bileşenleriyle çalışır. Statik sayfalar hazır içeriği sunarken dinamik sayfalar isteğe ve veriye göre üretilir.", ["HTML içerik yapısını, CSS görünümü düzenler", "İstemci tarafı kod tarayıcıda; sunucu tarafı kod sunucuda çalışır", "MVC veri, görünüm ve denetimi ayırır"], ["istemci", "sunucu", "HTTP", "statik", "dinamik"]),
@@ -130,6 +135,7 @@ export const courses: Course[] = [
     source: "https://www.anadolu.edu.tr/akademik/fakulteler/ders/247394/ag-yonetimi-ve-bilgi-guvenligi/ders-icerik",
     archiveSource: "https://aofsoru.com/ybs302u-ag-yonetimi-ve-bilgi-guvenligi-dersi-sinav-sorulari",
     archivePeriods: "2022–2023, 2023–2024 ve 2024–2025 yaz okulu",
+    archiveYears: ["2024–2025", "2023–2024", "2022–2023"],
     verification: "8 ünite başlığı resmî Anadolu ders içeriği sayfasıyla doğrulandı.",
     units: [
       u("YBS302U", 1, "Bilgisayar Ağlarına Genel Bakış", "Ağlar cihazların kaynak ve veri paylaşmasını sağlar. LAN, MAN ve WAN kapsama alanlarına göre; istemci-sunucu ve eşler arası yapılar çalışma biçimine göre sınıflanır. OSI ve TCP/IP katmanlı iletişim modelleridir.", ["OSI 7 katmandır", "IP mantıksal, MAC fiziksel adreslemedir", "Router ağlar arasında paket yönlendirir"], ["LAN", "WAN", "OSI", "TCP/IP", "router"]),

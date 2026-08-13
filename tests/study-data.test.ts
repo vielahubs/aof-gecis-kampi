@@ -15,6 +15,9 @@ test("keeps the v1 course and unit scope complete", () => {
     assert.equal(course.units.length, 8, `${course.code} must have eight units`);
     assert.match(course.source, /^https:\/\//);
     assert.match(course.archiveSource, /^https:\/\//);
+    assert.equal(course.archiveYears.length, 3, `${course.code} must list three summer-school exams`);
+    assert.equal(new Set(course.archiveYears).size, 3, `${course.code} archive years must be unique`);
+    course.archiveYears.forEach((year) => assert.match(year, /^20\d{2}–20\d{2}$/));
   });
 });
 

@@ -2,6 +2,18 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v1.2.0 - 2026-08-13
+
+### Eklendi
+
+- Denemeler sayfasına beş dersin her biri için incelenen üç yaz okulu sınavını ve 60 soruluk kapsamı gösteren Çıkmış Soru Arşivi eklendi.
+- Açık soru arşiviyle resmî Anadolu Üniversitesi sınav yayımlama sistemine doğrudan erişim eklendi.
+
+### İyileştirildi
+
+- Ünite kartlarındaki “Cevap” ve “Kısa Cevap” adlandırmaları “Sınav Notu” olarak güncellendi.
+- “Soru kalıpları ve kısa cevapları” başlığı “Soru kalıpları ve sınav notları” olarak değiştirildi.
+
 ## v1.1.0 - 2026-08-13
 
 ### İyileştirildi
