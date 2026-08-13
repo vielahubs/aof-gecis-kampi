@@ -2,6 +2,22 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.13.0 - 2026-08-13
+
+### Eklendi
+
+- 30, 60 veya 120 dakikaya göre eksik üniteleri, yanlışları, tekrar listesini ve düşük başarı alanlarını önceliklendiren Bugünün Çalışma Planı.
+- Günlük görevleri tamamlandı işaretleme, günlük ilerleme yüzdesi ve planı yeniden oluşturma.
+- Doğru, yanlış ve boş cevapları ünite bazında ölçen; ders ve ünite düzeyinde renkli sonuç gösteren Zayıflık Haritası.
+- 5 dersten 20 soruluk 30 dakikalık karma sınav provası ve her ders için ayrı süreli deneme.
+- Süre dolunca kalan soruları boş sayan otomatik deneme tamamlama ve sonuçların zayıflık haritasına aktarılması.
+
+### İyileştirildi
+
+- Ana sayfadaki çalışma rotası yeni günlük planla birleştirildi.
+- Üst çubuktaki “Odak” adı “Kronometre” olarak düzeltildi.
+- Mevcut cihaz verileri korunurken ayrıntılı soru istatistikleri için geriye uyumlu veri geçişi eklendi.
+
 ## v0.12.0 - 2026-08-13
 
 ### Eklendi

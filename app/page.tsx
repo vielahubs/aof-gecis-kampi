@@ -7,7 +7,7 @@ import { examGuides, getPatternAnswer } from "./exam-guides";
 import { historyDeepDives } from "./history-deep-dives";
 import LiveDuel from "./live-duel";
 
-type View = "dashboard" | "duel" | "search" | "review" | "focus" | "progress" | "course" | "quiz" | "mistakes" | "sources";
+type View = "dashboard" | "daily-plan" | "weakness" | "timed-exam" | "duel" | "search" | "review" | "focus" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
 type FocusMiniMode = "picture-in-picture" | "popup";
 type DocumentPictureInPicture = {
@@ -23,7 +23,11 @@ type QuizOrigin =
   | { kind: "mixed" }
   | { kind: "course"; courseCode: string }
   | { kind: "unit"; courseCode: string; unitNumber: number }
-  | { kind: "mistakes" };
+  | { kind: "mistakes" }
+  | { kind: "timed"; courseCode?: string; duration: number };
+type QuestionStat = { answered: number; correct: number; wrong: number; blank: number };
+type DailyPlanTask = { id: string; kind: "unit" | "mistakes" | "quiz" | "review"; unitId?: string; minutes: number };
+type DailyPlan = { date: string; minutes: number; tasks: DailyPlanTask[]; done: string[] };
 type StoredState = {
   completed: string[];
   mistakes: string[];
@@ -33,9 +37,11 @@ type StoredState = {
   notes: Record<string, string>;
   focusMinutes: number;
   focusSessions: number;
+  questionStats: Record<string, QuestionStat>;
+  dailyPlan?: DailyPlan;
 };
 
-const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {}, focusMinutes: 0, focusSessions: 0 };
+const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {}, focusMinutes: 0, focusSessions: 0, questionStats: {} };
 const lastUnitStorageKey = "aof-gecis-kampi-last-unit";
 const focusMiniStyles = `
   :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; background: #171a21; }
@@ -75,6 +81,18 @@ function shuffle<T>(items: T[]) {
   return [...items].sort(() => Math.random() - 0.5);
 }
 
+function localDateKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
+}
+
+function weaknessLevel(accuracy: number | null, activeMistakes: number) {
+  if (accuracy === null && activeMistakes === 0) return { key: "unknown", label: "Veri yok" };
+  if (activeMistakes > 0 || (accuracy !== null && accuracy < 50)) return { key: "critical", label: "Öncelikli" };
+  if (accuracy !== null && accuracy < 70) return { key: "developing", label: "Geliştir" };
+  if (accuracy !== null && accuracy < 85) return { key: "good", label: "İyi" };
+  return { key: "strong", label: "Güçlü" };
+}
+
 export default function Home() {
   const [view, setView] = useState<View>("dashboard");
   const [selectedCourse, setSelectedCourse] = useState<Course>(courses[0]);
@@ -90,6 +108,9 @@ export default function Home() {
   const [quizBlank, setQuizBlank] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [quizOrigin, setQuizOrigin] = useState<QuizOrigin>({ kind: "mixed" });
+  const [quizSeconds, setQuizSeconds] = useState(0);
+  const [quizEndsAt, setQuizEndsAt] = useState<number | null>(null);
+  const [planMinutes, setPlanMinutes] = useState(60);
   const [searchQuery, setSearchQuery] = useState("");
   const [lastUnitId, setLastUnitId] = useState<string | null>(null);
   const [focusDuration, setFocusDuration] = useState(25);
@@ -109,6 +130,8 @@ export default function Home() {
         try {
           const parsed = JSON.parse(saved) as Partial<StoredState>;
           const parsedNotes = parsed.notes && typeof parsed.notes === "object" ? Object.fromEntries(Object.entries(parsed.notes).filter((entry): entry is [string, string] => typeof entry[1] === "string")) : {};
+          const parsedQuestionStats = parsed.questionStats && typeof parsed.questionStats === "object" ? parsed.questionStats : {};
+          const parsedDailyPlan = parsed.dailyPlan && typeof parsed.dailyPlan === "object" && parsed.dailyPlan.date === localDateKey() ? parsed.dailyPlan : undefined;
           setStore({
             completed: Array.isArray(parsed.completed) ? parsed.completed : [],
             mistakes: Array.isArray(parsed.mistakes) ? parsed.mistakes : [],
@@ -118,7 +141,10 @@ export default function Home() {
             notes: parsedNotes,
             focusMinutes: typeof parsed.focusMinutes === "number" ? parsed.focusMinutes : 0,
             focusSessions: typeof parsed.focusSessions === "number" ? parsed.focusSessions : 0,
+            questionStats: parsedQuestionStats,
+            dailyPlan: parsedDailyPlan,
           });
+          if (parsedDailyPlan) setPlanMinutes(parsedDailyPlan.minutes);
         } catch { setStore(initialStore); }
       }
       const savedTheme = window.localStorage.getItem("aof-gecis-kampi-theme");
@@ -163,6 +189,34 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [focusDuration, focusEndsAt, focusRunning]);
 
+  useEffect(() => {
+    if (quizOrigin.kind !== "timed" || showResult || !quizEndsAt) return;
+    let finished = false;
+    const syncClock = () => {
+      const remaining = Math.max(0, Math.ceil((quizEndsAt - Date.now()) / 1000));
+      setQuizSeconds(remaining);
+      if (remaining === 0 && !finished) {
+        finished = true;
+        const firstBlank = picked === null ? quizIndex : quizIndex + 1;
+        const unanswered = quiz.slice(firstBlank);
+        setQuizBlank((value) => value + unanswered.length);
+        setStore((prev) => {
+          const questionStats = { ...prev.questionStats };
+          unanswered.forEach((question) => {
+            const current = questionStats[question.id] ?? { answered: 0, correct: 0, wrong: 0, blank: 0 };
+            questionStats[question.id] = { ...current, blank: current.blank + 1 };
+          });
+          return { ...prev, questionStats };
+        });
+        setQuizEndsAt(null);
+        setShowResult(true);
+      }
+    };
+    syncClock();
+    const timer = window.setInterval(syncClock, 250);
+    return () => window.clearInterval(timer);
+  }, [picked, quiz, quizEndsAt, quizIndex, quizOrigin.kind, showResult]);
+
   useEffect(() => () => {
     if (focusMiniWindow && !focusMiniWindow.closed) focusMiniWindow.close();
   }, [focusMiniWindow]);
@@ -170,12 +224,6 @@ export default function Home() {
   const totalUnits = courses.reduce((sum, course) => sum + course.units.length, 0);
   const completion = Math.round((store.completed.length / totalUnits) * 100);
   const accuracy = store.answered ? Math.round((store.correct / store.answered) * 100) : 0;
-
-  const todaysUnits = useMemo(() => {
-    const unfinished = courses.flatMap((course) => course.units.map((unit) => ({ course, unit })))
-      .filter(({ unit }) => !store.completed.includes(unit.id));
-    return unfinished.slice(0, 5);
-  }, [store.completed]);
 
   const lastUnit = useMemo(() => courses.flatMap((course) => course.units.map((unit, index) => ({ course, unit, unitNumber: index + 1 }))).find(({ unit }) => unit.id === lastUnitId), [lastUnitId]);
 
@@ -206,6 +254,18 @@ export default function Home() {
 
   const reviewUnits = useMemo(() => courses.flatMap((course) => course.units.map((unit, index) => ({ course, unit, unitNumber: index + 1 }))).filter(({ unit }) => store.bookmarks.includes(unit.id) || Boolean(store.notes[unit.id]?.trim())), [store.bookmarks, store.notes]);
 
+  const unitPerformance = useMemo(() => courses.flatMap((course) => course.units.map((unit, index) => {
+    const unitQuestions = questions.filter((question) => question.course === course.code && question.unit === index + 1);
+    const totals = unitQuestions.reduce((sum, question) => {
+      const stat = store.questionStats[question.id];
+      if (!stat) return sum;
+      return { attempts: sum.attempts + stat.answered + stat.blank, correct: sum.correct + stat.correct };
+    }, { attempts: 0, correct: 0 });
+    const activeMistakes = unitQuestions.filter((question) => store.mistakes.includes(question.id)).length;
+    const accuracy = totals.attempts ? Math.round((totals.correct / totals.attempts) * 100) : null;
+    return { course, unit, unitNumber: index + 1, attempts: totals.attempts, correct: totals.correct, activeMistakes, accuracy };
+  })), [store.mistakes, store.questionStats]);
+
   function openCourse(course: Course) {
     setSelectedCourse(course);
     setSelectedUnit(null);
@@ -235,6 +295,36 @@ export default function Home() {
 
   function updateNote(id: string, note: string) {
     setStore((prev) => ({ ...prev, notes: { ...prev.notes, [id]: note } }));
+  }
+
+  function generateDailyPlan(minutes = planMinutes) {
+    const date = localDateKey();
+    const unitCount = minutes === 30 ? 1 : minutes === 60 ? 2 : 4;
+    const ranked = [...unitPerformance]
+      .sort((a, b) => {
+        const score = (item: typeof a) => item.activeMistakes * 100 + (item.accuracy === null ? 0 : 100 - item.accuracy) + (store.bookmarks.includes(item.unit.id) ? 35 : 0) + (!store.completed.includes(item.unit.id) ? 20 : 0);
+        return score(b) - score(a);
+      })
+      .slice(0, unitCount);
+    const unitMinutes = 20;
+    const assessmentMinutes = minutes === 30 ? 10 : minutes === 60 ? 15 : 30;
+    const tasks: DailyPlanTask[] = ranked.map(({ unit }) => ({ id: `${date}-unit-${unit.id}`, kind: "unit", unitId: unit.id, minutes: unitMinutes }));
+    tasks.push({ id: `${date}-${store.mistakes.length ? "mistakes" : "quiz"}`, kind: store.mistakes.length ? "mistakes" : "quiz", minutes: assessmentMinutes });
+    if (minutes >= 60) tasks.push({ id: `${date}-review`, kind: "review", minutes: minutes === 60 ? 5 : 10 });
+    setStore((prev) => ({ ...prev, dailyPlan: { date, minutes, tasks, done: [] } }));
+  }
+
+  function togglePlanTask(taskId: string) {
+    setStore((prev) => prev.dailyPlan ? ({ ...prev, dailyPlan: { ...prev.dailyPlan, done: prev.dailyPlan.done.includes(taskId) ? prev.dailyPlan.done.filter((id) => id !== taskId) : [...prev.dailyPlan.done, taskId] } }) : prev);
+  }
+
+  function runPlanTask(task: DailyPlanTask) {
+    if (task.kind === "unit" && task.unitId) {
+      const target = unitPerformance.find(({ unit }) => unit.id === task.unitId);
+      if (target) openUnit(target.course, target.unit);
+    } else if (task.kind === "mistakes") startQuiz(undefined, true);
+    else if (task.kind === "quiz") startTimedExam(undefined, task.minutes);
+    else setView(reviewUnits.length ? "review" : "weakness");
   }
 
   function chooseFocusDuration(minutes: number) {
@@ -329,6 +419,8 @@ export default function Home() {
     setQuizWrong(0);
     setQuizBlank(0);
     setShowResult(false);
+    setQuizSeconds(0);
+    setQuizEndsAt(null);
     setQuizOrigin(mistakeOnly
       ? { kind: "mistakes" }
       : courseCode && unitNumber
@@ -339,7 +431,27 @@ export default function Home() {
     setView("quiz");
   }
 
+  function startTimedExam(courseCode?: string, requestedDuration?: number) {
+    const pool = courseCode ? questions.filter((question) => question.course === courseCode) : questions;
+    const questionCount = requestedDuration ? Math.min(pool.length, Math.max(5, Math.round(requestedDuration / 1.5))) : courseCode ? pool.length : Math.min(20, pool.length);
+    const next = shuffle(pool).slice(0, questionCount);
+    if (!next.length) return;
+    const duration = requestedDuration ?? (courseCode ? Math.max(10, Math.ceil(next.length * 1.5)) : 30);
+    setQuiz(next);
+    setQuizIndex(0);
+    setPicked(null);
+    setQuizCorrect(0);
+    setQuizWrong(0);
+    setQuizBlank(0);
+    setShowResult(false);
+    setQuizOrigin({ kind: "timed", courseCode, duration });
+    setQuizSeconds(duration * 60);
+    setQuizEndsAt(Date.now() + duration * 60 * 1000);
+    setView("quiz");
+  }
+
   function leaveQuiz() {
+    setQuizEndsAt(null);
     if (quizOrigin.kind === "unit") {
       const course = courses.find((item) => item.code === quizOrigin.courseCode);
       const unit = course?.units[quizOrigin.unitNumber - 1];
@@ -355,6 +467,10 @@ export default function Home() {
         return;
       }
     }
+    if (quizOrigin.kind === "timed") {
+      setView("timed-exam");
+      return;
+    }
     setView(quizOrigin.kind === "mistakes" ? "mistakes" : "dashboard");
   }
 
@@ -362,6 +478,7 @@ export default function Home() {
     if (quizOrigin.kind === "unit") startQuiz(quizOrigin.courseCode, false, quizOrigin.unitNumber);
     else if (quizOrigin.kind === "course") startQuiz(quizOrigin.courseCode);
     else if (quizOrigin.kind === "mistakes") startQuiz(undefined, true);
+    else if (quizOrigin.kind === "timed") startTimedExam(quizOrigin.courseCode, quizOrigin.duration);
     else startQuiz();
   }
 
@@ -377,12 +494,31 @@ export default function Home() {
       answered: prev.answered + 1,
       correct: prev.correct + (correct ? 1 : 0),
       mistakes: correct ? prev.mistakes.filter((id) => id !== current.id) : Array.from(new Set([...prev.mistakes, current.id])),
+      questionStats: {
+        ...prev.questionStats,
+        [current.id]: {
+          answered: (prev.questionStats[current.id]?.answered ?? 0) + 1,
+          correct: (prev.questionStats[current.id]?.correct ?? 0) + (correct ? 1 : 0),
+          wrong: (prev.questionStats[current.id]?.wrong ?? 0) + (correct ? 0 : 1),
+          blank: prev.questionStats[current.id]?.blank ?? 0,
+        },
+      },
     }));
   }
 
   function nextQuestion(blank = false) {
-    if (blank && picked === null) setQuizBlank((value) => value + 1);
-    if (quizIndex === quiz.length - 1) setShowResult(true);
+    if (blank && picked === null) {
+      const current = quiz[quizIndex];
+      setQuizBlank((value) => value + 1);
+      setStore((prev) => {
+        const stat = prev.questionStats[current.id] ?? { answered: 0, correct: 0, wrong: 0, blank: 0 };
+        return { ...prev, questionStats: { ...prev.questionStats, [current.id]: { ...stat, blank: stat.blank + 1 } } };
+      });
+    }
+    if (quizIndex === quiz.length - 1) {
+      setQuizEndsAt(null);
+      setShowResult(true);
+    }
     else {
       setQuizIndex((value) => value + 1);
       setPicked(null);
@@ -395,6 +531,10 @@ export default function Home() {
   const focusClock = `${String(Math.floor(focusSeconds / 60)).padStart(2, "0")}:${String(focusSeconds % 60).padStart(2, "0")}`;
   const focusProgress = Math.round((1 - focusSeconds / (focusDuration * 60)) * 100);
   const focusTotal = store.focusMinutes >= 60 ? `${Math.floor(store.focusMinutes / 60)} sa ${store.focusMinutes % 60} dk` : `${store.focusMinutes} dk`;
+  const timedClock = `${String(Math.floor(quizSeconds / 60)).padStart(2, "0")}:${String(quizSeconds % 60).padStart(2, "0")}`;
+  const currentPlan = store.dailyPlan?.date === localDateKey() ? store.dailyPlan : undefined;
+  const planProgress = currentPlan?.tasks.length ? Math.round((currentPlan.done.length / currentPlan.tasks.length) * 100) : 0;
+  const weakestUnits = [...unitPerformance].filter(({ attempts, activeMistakes }) => attempts > 0 || activeMistakes > 0).sort((a, b) => b.activeMistakes - a.activeMistakes || (a.accuracy ?? 101) - (b.accuracy ?? 101)).slice(0, 5);
 
   return (
     <main className="app-shell">
@@ -406,6 +546,9 @@ export default function Home() {
 
         <nav className="main-nav" aria-label="Ana menü">
           <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><span>⌂</span> Genel Bakış</button>
+          <button className={view === "daily-plan" ? "active" : ""} onClick={() => setView("daily-plan")}><span>☷</span> Bugünün Planı</button>
+          <button className={view === "weakness" ? "active" : ""} onClick={() => setView("weakness")}><span>◫</span> Zayıflık Haritası</button>
+          <button className={view === "timed-exam" ? "active" : ""} onClick={() => setView("timed-exam")}><span>⏱</span> Süreli Deneme</button>
           <button className={view === "duel" ? "active" : ""} onClick={() => setView("duel")}><span>⚔</span> Canlı Düello</button>
           <button className={view === "search" ? "active" : ""} onClick={() => setView("search")}><span>⌕</span> İçerikte Ara</button>
           <button className={view === "review" ? "active" : ""} onClick={() => setView("review")}><span>★</span> Tekrar Panosu <em>{reviewUnits.length}</em></button>
@@ -438,7 +581,7 @@ export default function Home() {
       <section className="content">
         <header className="topbar">
           <div><span className="status-dot" /> Veriler bu cihazda saklanıyor</div>
-          <div className="top-actions"><button className={focusRunning ? "focus-mini running" : "focus-mini"} onClick={openFocusMiniWindow} title="Odak sayacını mini pencerede aç">{focusRunning ? `◉ ${focusClock}` : "◷ Odak"}</button><button className="theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "Açık temaya geç" : "Karanlık temaya geç"}>{theme === "dark" ? "☀ Açık" : "☾ Koyu"}</button><span className="date-pill">22 AĞU</span><button onClick={() => startQuiz()}>Hızlı deneme</button></div>
+          <div className="top-actions"><button className={focusRunning ? "focus-mini running" : "focus-mini"} onClick={openFocusMiniWindow} title="Kronometreyi mini pencerede aç">{focusRunning ? `◉ ${focusClock}` : "◷ Kronometre"}</button><button className="theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "Açık temaya geç" : "Karanlık temaya geç"}>{theme === "dark" ? "☀ Açık" : "☾ Koyu"}</button><span className="date-pill">22 AĞU</span><button onClick={() => startQuiz()}>Hızlı deneme</button></div>
         </header>
 
         {view === "dashboard" && (
@@ -448,7 +591,7 @@ export default function Home() {
                 <p className="eyebrow">YAZ OKULU • 5 DERS • 40 ÜNİTE</p>
                 <h1>Geçmek için ne çalışacağını<br />her gün netleştir.</h1>
                 <p>Bütün üniteler kapsamda. 300 yaz okulu sorusu tarandı; tekrar eden kavramlar konu anlatımlarına ve sınav tuzaklarına dönüştürüldü.</p>
-                <div className="hero-actions"><button className="primary" onClick={() => lastUnit ? openUnit(lastUnit.course, lastUnit.unit) : todaysUnits[0] && openUnit(todaysUnits[0].course, todaysUnits[0].unit)}>{lastUnit ? "Kaldığın yerden devam et" : "Bugünün planına başla"} <span>→</span></button><button className="ghost" onClick={() => setView("duel")}>Arkadaşınla yarış</button><button className="ghost" onClick={() => startQuiz()}>Seviye denemesi</button></div>
+                <div className="hero-actions"><button className="primary" onClick={() => setView("daily-plan")}>Bugünün planını aç <span>→</span></button><button className="ghost" onClick={() => setView("duel")}>Arkadaşınla yarış</button><button className="ghost" onClick={() => setView("timed-exam")}>Süreli deneme</button></div>
               </div>
               <div className="countdown-card">
                 <span>Sınava kalan</span>
@@ -465,20 +608,23 @@ export default function Home() {
               <article><span>Genel ilerleme</span><strong>%{completion}</strong><small>40 ünitenin {store.completed.length} tanesi tamam</small></article>
               <article><span>Soru doğruluğu</span><strong>%{accuracy}</strong><small>{store.answered || 0} cevap üzerinden</small></article>
               <article><span>Tekrar bekleyen</span><strong>{store.mistakes.length}</strong><small>yanlış soru</small></article>
-              <article><span>Günlük hedef</span><strong>5</strong><small>ünite / yaklaşık 2,5 saat</small></article>
+              <article><span>Bugünkü plan</span><strong>%{planProgress}</strong><small>{currentPlan ? `${currentPlan.done.length}/${currentPlan.tasks.length} görev tamam` : "henüz oluşturulmadı"}</small></article>
             </section>
 
             <div className="dashboard-grid">
               <section className="panel today-panel">
-                <div className="panel-heading"><div><p className="eyebrow">BUGÜN</p><h2>Çalışma rotan</h2></div><span>{todaysUnits.length} görev</span></div>
+                <div className="panel-heading"><div><p className="eyebrow">BUGÜN</p><h2>Çalışma planın</h2></div><button className="panel-link" onClick={() => setView("daily-plan")}>{currentPlan ? "Planı aç →" : "Plan oluştur →"}</button></div>
                 <div className="task-list">
-                  {todaysUnits.length ? todaysUnits.map(({ course, unit }, index) => (
-                    <button key={unit.id} onClick={() => openUnit(course, unit)}>
+                  {currentPlan ? currentPlan.tasks.map((task, index) => {
+                    const target = task.unitId ? unitPerformance.find(({ unit }) => unit.id === task.unitId) : undefined;
+                    const title = target ? `Ünite ${target.unitNumber} · ${target.unit.title}` : task.kind === "mistakes" ? "Yanlış soruları tekrar çöz" : task.kind === "quiz" ? "Süreli karışık deneme" : "Kısa tekrar ve kontrol";
+                    const detail = target ? `${target.course.code} · ${task.minutes} dakika` : `${task.minutes} dakika`;
+                    return <button key={task.id} className={currentPlan.done.includes(task.id) ? "done" : ""} onClick={() => runPlanTask(task)}>
                       <span className="task-index">{String(index + 1).padStart(2, "0")}</span>
-                      <span className="task-copy"><small style={{ color: course.color }}>{course.code}</small><strong>Ünite {course.units.indexOf(unit) + 1} · {unit.title}</strong><em>Konu anlatımı + soru sinyalleri + hafıza kancası</em></span>
+                      <span className="task-copy"><small style={{ color: target?.course.color }}>{currentPlan.done.includes(task.id) ? "TAMAMLANDI" : detail}</small><strong>{title}</strong><em>{target ? "Konu anlatımı + soru sinyalleri + hafıza kancası" : "Plandaki sırayla ilerle"}</em></span>
                       <span className="task-arrow">→</span>
-                    </button>
-                  )) : <div className="empty-state"><strong>Tüm üniteler tamam!</strong><p>Şimdi karışık denemelerle bilgini sağlamlaştır.</p></div>}
+                    </button>;
+                  }) : <div className="empty-state"><strong>Bugünkü rotanı oluştur</strong><p>Ayırabileceğin süreye göre ünite, tekrar ve deneme görevleri otomatik seçilir.</p><button className="primary" onClick={() => setView("daily-plan")}>Planı hazırla</button></div>}
                 </div>
               </section>
 
@@ -492,6 +638,85 @@ export default function Home() {
                 </div>
               </section>
             </div>
+          </div>
+        )}
+
+        {view === "daily-plan" && (
+          <div className="page daily-plan-page">
+            <p className="eyebrow">KİŞİSEL GÜNLÜK ROTA</p>
+            <h1>Bugünün çalışma planı</h1>
+            <p className="lead">Ayırabildiğin süreyi seç. Plan; tamamlanmayan üniteleri, aktif yanlışlarını, düşük doğruluk oranlarını ve tekrar listesini önceliklendirir.</p>
+            <section className="plan-builder">
+              <div>
+                <span>BUGÜN KAÇ DAKİKAN VAR?</span>
+                <div className="plan-duration-options">{[30, 60, 120].map((minutes) => <button key={minutes} className={planMinutes === minutes ? "active" : ""} onClick={() => setPlanMinutes(minutes)}><strong>{minutes}</strong><small>dakika</small></button>)}</div>
+              </div>
+              <button className="primary" onClick={() => generateDailyPlan(planMinutes)}>{currentPlan ? "Planı yeniden oluştur" : "Planımı oluştur"} →</button>
+            </section>
+            {currentPlan ? <>
+              <section className="plan-progress-card">
+                <div><span>BUGÜNKÜ İLERLEME</span><strong>%{planProgress}</strong><small>{currentPlan.done.length} / {currentPlan.tasks.length} görev tamamlandı</small></div>
+                <div><i style={{ width: `${planProgress}%` }} /></div>
+              </section>
+              <div className="daily-task-list">{currentPlan.tasks.map((task, index) => {
+                const target = task.unitId ? unitPerformance.find(({ unit }) => unit.id === task.unitId) : undefined;
+                const done = currentPlan.done.includes(task.id);
+                const title = target ? target.unit.title : task.kind === "mistakes" ? "Yanlışlarını yeniden çöz" : task.kind === "quiz" ? "Süreli karışık deneme" : reviewUnits.length ? "Tekrar panosunu gözden geçir" : "Zayıflık haritanı kontrol et";
+                const description = target ? `${target.course.short} · Ünite ${target.unitNumber}${target.activeMistakes ? ` · ${target.activeMistakes} aktif yanlış` : target.accuracy !== null ? ` · %${target.accuracy} doğruluk` : " · henüz ölçülmedi"}` : task.kind === "mistakes" ? `${store.mistakes.length} bekleyen soruyu temizle` : task.kind === "quiz" ? "Süre baskısı altında genel seviyeni ölç" : "Eksik kalan başlıkları son kez tara";
+                return <article key={task.id} className={done ? "done" : ""} style={{ "--course-color": target?.course.color ?? "#ff705d" } as React.CSSProperties}>
+                  <button className="plan-task-check" onClick={() => togglePlanTask(task.id)} aria-label={done ? "Görevi tamamlanmadı işaretle" : "Görevi tamamlandı işaretle"}>{done ? "✓" : index + 1}</button>
+                  <div><small>{task.minutes} DAKİKA</small><h2>{title}</h2><p>{description}</p></div>
+                  <button className="plan-task-open" onClick={() => runPlanTask(task)}>{done ? "Tekrar aç" : "Başla"} →</button>
+                </article>;
+              })}</div>
+              {planProgress === 100 && <section className="plan-complete"><span>✓</span><div><strong>Bugünkü plan tamamlandı.</strong><p>İstersen yeni bir plan oluşturabilir veya süreli denemeyle devam edebilirsin.</p></div><button className="ghost" onClick={() => setView("timed-exam")}>Süreli deneme aç</button></section>}
+            </> : <div className="empty-large"><span>☷</span><h2>Planın hazır değil</h2><p>30, 60 veya 120 dakika seçip bugünün sınav odaklı rotasını oluştur.</p></div>}
+          </div>
+        )}
+
+        {view === "weakness" && (
+          <div className="page weakness-page">
+            <p className="eyebrow">SONUÇLARA GÖRE</p>
+            <h1>Zayıflık Haritası</h1>
+            <p className="lead">Her hücre o ünitedeki doğru, yanlış ve boş cevaplarına göre renklenir. Aktif bir yanlış varsa ünite doğrudan öncelikli sayılır.</p>
+            <div className="weakness-legend"><span><i className="critical" /> Öncelikli</span><span><i className="developing" /> Geliştir</span><span><i className="good" /> İyi</span><span><i className="strong" /> Güçlü</span><span><i className="unknown" /> Veri yok</span></div>
+            <div className="weakness-course-list">{courses.map((course) => {
+              const results = unitPerformance.filter((item) => item.course.code === course.code);
+              const attempts = results.reduce((sum, item) => sum + item.attempts, 0);
+              const correct = results.reduce((sum, item) => sum + item.correct, 0);
+              const courseAccuracy = attempts ? Math.round((correct / attempts) * 100) : null;
+              return <section className="weakness-course" key={course.code} style={{ "--course-color": course.color } as React.CSSProperties}>
+                <header><div><small>{course.code}</small><h2>{course.title}</h2></div><div><strong>{courseAccuracy === null ? "—" : `%${courseAccuracy}`}</strong><span>{attempts ? `${attempts} cevap` : "henüz ölçülmedi"}</span></div></header>
+                <div className="weakness-unit-grid">{results.map((result) => {
+                  const level = weaknessLevel(result.accuracy, result.activeMistakes);
+                  return <button key={result.unit.id} className={`weakness-unit ${level.key}`} onClick={() => openUnit(course, result.unit)} title={result.unit.title}>
+                    <span>ÜNİTE {result.unitNumber}</span><strong>{result.accuracy === null ? "—" : `%${result.accuracy}`}</strong><small>{result.activeMistakes ? `${result.activeMistakes} yanlış` : level.label}</small>
+                  </button>;
+                })}</div>
+              </section>;
+            })}</div>
+            <section className="weakness-priority">
+              <div><p className="eyebrow">ÖNCELİKLİ TEKRAR</p><h2>{weakestUnits.length ? "Önce bunları güçlendir" : "Haritayı oluşturmak için deneme çöz"}</h2></div>
+              {weakestUnits.length ? <div>{weakestUnits.map((item, index) => <button key={item.unit.id} onClick={() => openUnit(item.course, item.unit)}><span>{index + 1}</span><div><small>{item.course.short} · Ünite {item.unitNumber}</small><strong>{item.unit.title}</strong></div><em>{item.activeMistakes ? `${item.activeMistakes} yanlış` : `%${item.accuracy}`}</em></button>)}</div> : <button className="primary" onClick={() => setView("timed-exam")}>Süreli deneme başlat →</button>}
+            </section>
+          </div>
+        )}
+
+        {view === "timed-exam" && (
+          <div className="page timed-exam-page">
+            <p className="eyebrow">SINAV PROVASI</p>
+            <h1>Süreli Deneme</h1>
+            <p className="lead">Sayaç başladığında durmaz. Süre biterse çözülmeyen sorular boş sayılır ve deneme otomatik tamamlanır.</p>
+            <section className="timed-exam-hero">
+              <div><span>KARIŞIK DENEME</span><h2>5 dersten 20 soru</h2><p>30 dakika · 4 yanlış 1 doğruyu götürür · sorular karışık gelir</p></div>
+              <button className="primary" onClick={() => startTimedExam()}>30 dakikalık denemeyi başlat →</button>
+            </section>
+            <div className="timed-course-grid">{courses.map((course) => {
+              const count = questions.filter((question) => question.course === course.code).length;
+              const duration = Math.max(10, Math.ceil(count * 1.5));
+              return <article key={course.code} style={{ "--course-color": course.color } as React.CSSProperties}><span>{course.code}</span><h2>{course.title}</h2><p>{count} soru · {duration} dakika</p><button onClick={() => startTimedExam(course.code)}>Ders provasını başlat →</button></article>;
+            })}</div>
+            <section className="timed-rules"><strong>Deneme kuralları</strong><div><span>01</span><p>Soruyu yanıtladıktan sonra geri dönüş yoktur.</p><span>02</span><p>Boş bırakabilirsin; boşlar neti düşürmez.</p><span>03</span><p>Süre dolunca kalan sorular otomatik boş kaydedilir.</p><span>04</span><p>Sonuçlar zayıflık haritasını günceller.</p></div></section>
           </div>
         )}
 
@@ -681,7 +906,7 @@ export default function Home() {
         {view === "quiz" && currentQuestion && (
           <div className="page quiz-page">
             {!showResult ? <>
-              <div className="quiz-top"><button className="back-link" onClick={leaveQuiz}>× Denemeden çık</button><span>Soru {quizIndex + 1} / {quiz.length}</span></div>
+              <div className="quiz-top"><button className="back-link" onClick={leaveQuiz}>× Denemeden çık</button>{quizOrigin.kind === "timed" && <strong className={quizSeconds <= 60 ? "quiz-clock urgent" : "quiz-clock"}>⏱ {timedClock}</strong>}<span>Soru {quizIndex + 1} / {quiz.length}</span></div>
               <div className="quiz-progress"><i style={{ width: `${((quizIndex + 1) / quiz.length) * 100}%` }} /></div>
               <section className="question-card">
                 <div className="question-meta"><span>{currentQuestion.course}</span><span>Ünite {currentQuestion.unit}</span></div>
@@ -695,7 +920,7 @@ export default function Home() {
                 {picked !== null && <div className={picked === currentQuestion.answer ? "feedback correct" : "feedback wrong"}><strong>{picked === currentQuestion.answer ? "Doğru cevap" : `Doğru cevap: ${String.fromCharCode(65 + currentQuestion.answer)}`}</strong><p>{currentQuestion.explanation}</p></div>}
                 <div className="question-actions"><span>{picked === null ? "Bilmiyorsan boş bırak; 4 yanlış 1 doğruyu götürüyor." : "Açıklamayı anladıysan devam et."}</span><button className="primary" onClick={() => nextQuestion(picked === null)}>{picked === null ? "Boş bırak" : quizIndex === quiz.length - 1 ? "Sonucu gör" : "Sonraki soru"} →</button></div>
               </section>
-            </> : <section className="result-card"><span className="result-ring">%{estimated}</span><p className="eyebrow">DENEME TAMAMLANDI</p><h1>{estimated >= 70 ? "Gayet iyi gidiyorsun." : estimated >= 50 ? "Geçiş çizgisine yaklaşıyorsun." : "Yanlışları kapatıp yeniden dene."}</h1><div className="result-stats"><div><strong>{quizCorrect}</strong><span>Doğru</span></div><div><strong>{quizWrong}</strong><span>Yanlış</span></div><div><strong>{quizBlank}</strong><span>Boş</span></div><div><strong>{net.toFixed(2)}</strong><span>Net</span></div></div><p>Bu hesaplama çalışma tahminidir. Gerçek harf notu üniversitenin değerlendirme sistemine göre belirlenir.</p><div className="hero-actions"><button className="primary" onClick={quizOrigin.kind === "unit" ? leaveQuiz : restartQuiz}>{quizOrigin.kind === "unit" ? "Üniteye dön" : "Yeni deneme"}</button><button className="ghost" onClick={() => setView("mistakes")}>Yanlışları gör</button></div></section>}
+            </> : <section className="result-card"><span className="result-ring">%{estimated}</span><p className="eyebrow">{quizOrigin.kind === "timed" ? "SÜRELİ DENEME TAMAMLANDI" : "DENEME TAMAMLANDI"}</p><h1>{estimated >= 70 ? "Gayet iyi gidiyorsun." : estimated >= 50 ? "Geçiş çizgisine yaklaşıyorsun." : "Yanlışları kapatıp yeniden dene."}</h1><div className="result-stats"><div><strong>{quizCorrect}</strong><span>Doğru</span></div><div><strong>{quizWrong}</strong><span>Yanlış</span></div><div><strong>{quizBlank}</strong><span>Boş</span></div><div><strong>{net.toFixed(2)}</strong><span>Net</span></div></div><p>Bu hesaplama çalışma tahminidir. Gerçek harf notu üniversitenin değerlendirme sistemine göre belirlenir.</p><div className="hero-actions"><button className="primary" onClick={quizOrigin.kind === "unit" ? leaveQuiz : restartQuiz}>{quizOrigin.kind === "unit" ? "Üniteye dön" : "Yeni deneme"}</button><button className="ghost" onClick={() => setView("weakness")}>Zayıflık haritası</button><button className="ghost" onClick={() => setView("mistakes")}>Yanlışları gör</button></div></section>}
           </div>
         )}
       </section>
