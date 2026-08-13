@@ -8,6 +8,11 @@ import LiveDuel from "./live-duel";
 
 type View = "dashboard" | "duel" | "search" | "review" | "focus" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
+type QuizOrigin =
+  | { kind: "mixed" }
+  | { kind: "course"; courseCode: string }
+  | { kind: "unit"; courseCode: string; unitNumber: number }
+  | { kind: "mistakes" };
 type StoredState = {
   completed: string[];
   mistakes: string[];
@@ -50,6 +55,7 @@ export default function Home() {
   const [quizWrong, setQuizWrong] = useState(0);
   const [quizBlank, setQuizBlank] = useState(0);
   const [showResult, setShowResult] = useState(false);
+  const [quizOrigin, setQuizOrigin] = useState<QuizOrigin>({ kind: "mixed" });
   const [searchQuery, setSearchQuery] = useState("");
   const [lastUnitId, setLastUnitId] = useState<string | null>(null);
   const [focusDuration, setFocusDuration] = useState(25);
@@ -215,7 +221,40 @@ export default function Home() {
     setQuizWrong(0);
     setQuizBlank(0);
     setShowResult(false);
+    setQuizOrigin(mistakeOnly
+      ? { kind: "mistakes" }
+      : courseCode && unitNumber
+        ? { kind: "unit", courseCode, unitNumber }
+        : courseCode
+          ? { kind: "course", courseCode }
+          : { kind: "mixed" });
     setView("quiz");
+  }
+
+  function leaveQuiz() {
+    if (quizOrigin.kind === "unit") {
+      const course = courses.find((item) => item.code === quizOrigin.courseCode);
+      const unit = course?.units[quizOrigin.unitNumber - 1];
+      if (course && unit) {
+        openUnit(course, unit);
+        return;
+      }
+    }
+    if (quizOrigin.kind === "course") {
+      const course = courses.find((item) => item.code === quizOrigin.courseCode);
+      if (course) {
+        openCourse(course);
+        return;
+      }
+    }
+    setView(quizOrigin.kind === "mistakes" ? "mistakes" : "dashboard");
+  }
+
+  function restartQuiz() {
+    if (quizOrigin.kind === "unit") startQuiz(quizOrigin.courseCode, false, quizOrigin.unitNumber);
+    else if (quizOrigin.kind === "course") startQuiz(quizOrigin.courseCode);
+    else if (quizOrigin.kind === "mistakes") startQuiz(undefined, true);
+    else startQuiz();
   }
 
   function answerQuestion(option: number) {
@@ -533,7 +572,7 @@ export default function Home() {
         {view === "quiz" && currentQuestion && (
           <div className="page quiz-page">
             {!showResult ? <>
-              <div className="quiz-top"><button className="back-link" onClick={() => setView("dashboard")}>× Denemeden çık</button><span>Soru {quizIndex + 1} / {quiz.length}</span></div>
+              <div className="quiz-top"><button className="back-link" onClick={leaveQuiz}>× Denemeden çık</button><span>Soru {quizIndex + 1} / {quiz.length}</span></div>
               <div className="quiz-progress"><i style={{ width: `${((quizIndex + 1) / quiz.length) * 100}%` }} /></div>
               <section className="question-card">
                 <div className="question-meta"><span>{currentQuestion.course}</span><span>Ünite {currentQuestion.unit}</span></div>
@@ -547,7 +586,7 @@ export default function Home() {
                 {picked !== null && <div className={picked === currentQuestion.answer ? "feedback correct" : "feedback wrong"}><strong>{picked === currentQuestion.answer ? "Doğru cevap" : `Doğru cevap: ${String.fromCharCode(65 + currentQuestion.answer)}`}</strong><p>{currentQuestion.explanation}</p></div>}
                 <div className="question-actions"><span>{picked === null ? "Bilmiyorsan boş bırak; 4 yanlış 1 doğruyu götürüyor." : "Açıklamayı anladıysan devam et."}</span><button className="primary" onClick={() => nextQuestion(picked === null)}>{picked === null ? "Boş bırak" : quizIndex === quiz.length - 1 ? "Sonucu gör" : "Sonraki soru"} →</button></div>
               </section>
-            </> : <section className="result-card"><span className="result-ring">%{estimated}</span><p className="eyebrow">DENEME TAMAMLANDI</p><h1>{estimated >= 70 ? "Gayet iyi gidiyorsun." : estimated >= 50 ? "Geçiş çizgisine yaklaşıyorsun." : "Yanlışları kapatıp yeniden dene."}</h1><div className="result-stats"><div><strong>{quizCorrect}</strong><span>Doğru</span></div><div><strong>{quizWrong}</strong><span>Yanlış</span></div><div><strong>{quizBlank}</strong><span>Boş</span></div><div><strong>{net.toFixed(2)}</strong><span>Net</span></div></div><p>Bu hesaplama çalışma tahminidir. Gerçek harf notu üniversitenin değerlendirme sistemine göre belirlenir.</p><div className="hero-actions"><button className="primary" onClick={() => startQuiz()}>Yeni deneme</button><button className="ghost" onClick={() => setView("mistakes")}>Yanlışları gör</button></div></section>}
+            </> : <section className="result-card"><span className="result-ring">%{estimated}</span><p className="eyebrow">DENEME TAMAMLANDI</p><h1>{estimated >= 70 ? "Gayet iyi gidiyorsun." : estimated >= 50 ? "Geçiş çizgisine yaklaşıyorsun." : "Yanlışları kapatıp yeniden dene."}</h1><div className="result-stats"><div><strong>{quizCorrect}</strong><span>Doğru</span></div><div><strong>{quizWrong}</strong><span>Yanlış</span></div><div><strong>{quizBlank}</strong><span>Boş</span></div><div><strong>{net.toFixed(2)}</strong><span>Net</span></div></div><p>Bu hesaplama çalışma tahminidir. Gerçek harf notu üniversitenin değerlendirme sistemine göre belirlenir.</p><div className="hero-actions"><button className="primary" onClick={quizOrigin.kind === "unit" ? leaveQuiz : restartQuiz}>{quizOrigin.kind === "unit" ? "Üniteye dön" : "Yeni deneme"}</button><button className="ghost" onClick={() => setView("mistakes")}>Yanlışları gör</button></div></section>}
           </div>
         )}
       </section>
