@@ -2,6 +2,21 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.15.0 - 2026-08-13
+
+### Eklendi
+
+- Çalış alanındaki Tekrar Merkezi’ne 15 kartlık Akıllı Tekrar Kartları.
+- Mevcut sınav soru kalıpları ve kısa cevaplardan oluşturulan 120 kişisel çalışma kartı.
+- Cevabı göstermeden önce zihinden hatırlamayı destekleyen çift yüzlü kart akışı.
+- Her kart için “Biliyorum” ve “Tekrar et” değerlendirmesi ile cihazda saklanan kart geçmişi.
+- Tekrar bekleyen ve güçlü kart sayaçları ile oturum sonu özeti.
+- Zorlanılan kartların sonraki kart oturumlarında ve Bugünün Çalışma Planı’nda öne alınması.
+
+### İyileştirildi
+
+- Tekrar Panosu; akıllı kartları, yıldızlanan üniteleri ve kişisel notları birleştiren Tekrar Merkezi’ne dönüştürüldü.
+
 ## v0.14.0 - 2026-08-13
 
 ### Yenilendi

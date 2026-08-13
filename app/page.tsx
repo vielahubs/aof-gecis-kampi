@@ -26,6 +26,8 @@ type QuizOrigin =
   | { kind: "mistakes" }
   | { kind: "timed"; courseCode?: string; duration: number };
 type QuestionStat = { answered: number; correct: number; wrong: number; blank: number };
+type ReviewCardStat = { known: number; repeat: number; lastReviewed: string };
+type SmartReviewCard = { id: string; course: Course; unit: Unit; unitNumber: number; prompt: string; answer: string };
 type DailyPlanTask = { id: string; kind: "unit" | "mistakes" | "quiz" | "review"; unitId?: string; minutes: number };
 type DailyPlan = { date: string; minutes: number; tasks: DailyPlanTask[]; done: string[] };
 type StoredState = {
@@ -38,10 +40,11 @@ type StoredState = {
   focusMinutes: number;
   focusSessions: number;
   questionStats: Record<string, QuestionStat>;
+  reviewCardStats: Record<string, ReviewCardStat>;
   dailyPlan?: DailyPlan;
 };
 
-const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {}, focusMinutes: 0, focusSessions: 0, questionStats: {} };
+const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {}, focusMinutes: 0, focusSessions: 0, questionStats: {}, reviewCardStats: {} };
 const lastUnitStorageKey = "aof-gecis-kampi-last-unit";
 const studySectionViews: View[] = ["daily-plan", "focus", "review", "search"];
 const examSectionViews: View[] = ["timed-exam", "quiz", "mistakes", "duel"];
@@ -125,6 +128,12 @@ export default function Home() {
   const [focusMiniWindow, setFocusMiniWindow] = useState<Window | null>(null);
   const [focusMiniRoot, setFocusMiniRoot] = useState<HTMLElement | null>(null);
   const [focusMiniMode, setFocusMiniMode] = useState<FocusMiniMode | null>(null);
+  const [reviewDeck, setReviewDeck] = useState<string[]>([]);
+  const [reviewCardIndex, setReviewCardIndex] = useState(0);
+  const [reviewCardRevealed, setReviewCardRevealed] = useState(false);
+  const [reviewSessionFinished, setReviewSessionFinished] = useState(false);
+  const [reviewKnown, setReviewKnown] = useState(0);
+  const [reviewRepeat, setReviewRepeat] = useState(0);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -134,6 +143,7 @@ export default function Home() {
           const parsed = JSON.parse(saved) as Partial<StoredState>;
           const parsedNotes = parsed.notes && typeof parsed.notes === "object" ? Object.fromEntries(Object.entries(parsed.notes).filter((entry): entry is [string, string] => typeof entry[1] === "string")) : {};
           const parsedQuestionStats = parsed.questionStats && typeof parsed.questionStats === "object" ? parsed.questionStats : {};
+          const parsedReviewCardStats = parsed.reviewCardStats && typeof parsed.reviewCardStats === "object" ? parsed.reviewCardStats : {};
           const parsedDailyPlan = parsed.dailyPlan && typeof parsed.dailyPlan === "object" && parsed.dailyPlan.date === localDateKey() ? parsed.dailyPlan : undefined;
           setStore({
             completed: Array.isArray(parsed.completed) ? parsed.completed : [],
@@ -145,6 +155,7 @@ export default function Home() {
             focusMinutes: typeof parsed.focusMinutes === "number" ? parsed.focusMinutes : 0,
             focusSessions: typeof parsed.focusSessions === "number" ? parsed.focusSessions : 0,
             questionStats: parsedQuestionStats,
+            reviewCardStats: parsedReviewCardStats,
             dailyPlan: parsedDailyPlan,
           });
           if (parsedDailyPlan) setPlanMinutes(parsedDailyPlan.minutes);
@@ -257,6 +268,15 @@ export default function Home() {
 
   const reviewUnits = useMemo(() => courses.flatMap((course) => course.units.map((unit, index) => ({ course, unit, unitNumber: index + 1 }))).filter(({ unit }) => store.bookmarks.includes(unit.id) || Boolean(store.notes[unit.id]?.trim())), [store.bookmarks, store.notes]);
 
+  const reviewCards = useMemo<SmartReviewCard[]>(() => courses.flatMap((course) => course.units.flatMap((unit, unitIndex) => examGuides[unit.id].patterns.map((prompt, patternIndex) => ({
+    id: `${unit.id}-pattern-${patternIndex}`,
+    course,
+    unit,
+    unitNumber: unitIndex + 1,
+    prompt,
+    answer: getPatternAnswer(unit.id, patternIndex),
+  })))), []);
+
   const unitPerformance = useMemo(() => courses.flatMap((course) => course.units.map((unit, index) => {
     const unitQuestions = questions.filter((question) => question.course === course.code && question.unit === index + 1);
     const totals = unitQuestions.reduce((sum, question) => {
@@ -265,9 +285,13 @@ export default function Home() {
       return { attempts: sum.attempts + stat.answered + stat.blank, correct: sum.correct + stat.correct };
     }, { attempts: 0, correct: 0 });
     const activeMistakes = unitQuestions.filter((question) => store.mistakes.includes(question.id)).length;
+    const reviewDue = reviewCards.filter((card) => card.unit.id === unit.id).filter((card) => {
+      const stat = store.reviewCardStats[card.id];
+      return stat && stat.repeat > stat.known;
+    }).length;
     const accuracy = totals.attempts ? Math.round((totals.correct / totals.attempts) * 100) : null;
-    return { course, unit, unitNumber: index + 1, attempts: totals.attempts, correct: totals.correct, activeMistakes, accuracy };
-  })), [store.mistakes, store.questionStats]);
+    return { course, unit, unitNumber: index + 1, attempts: totals.attempts, correct: totals.correct, activeMistakes, reviewDue, accuracy };
+  })), [reviewCards, store.mistakes, store.questionStats, store.reviewCardStats]);
 
   function openCourse(course: Course) {
     setSelectedCourse(course);
@@ -305,7 +329,7 @@ export default function Home() {
     const unitCount = minutes === 30 ? 1 : minutes === 60 ? 2 : 4;
     const ranked = [...unitPerformance]
       .sort((a, b) => {
-        const score = (item: typeof a) => item.activeMistakes * 100 + (item.accuracy === null ? 0 : 100 - item.accuracy) + (store.bookmarks.includes(item.unit.id) ? 35 : 0) + (!store.completed.includes(item.unit.id) ? 20 : 0);
+        const score = (item: typeof a) => item.activeMistakes * 100 + item.reviewDue * 45 + (item.accuracy === null ? 0 : 100 - item.accuracy) + (store.bookmarks.includes(item.unit.id) ? 35 : 0) + (!store.completed.includes(item.unit.id) ? 20 : 0);
         return score(b) - score(a);
       })
       .slice(0, unitCount);
@@ -327,7 +351,53 @@ export default function Home() {
       if (target) openUnit(target.course, target.unit);
     } else if (task.kind === "mistakes") startQuiz(undefined, true);
     else if (task.kind === "quiz") startTimedExam(undefined, task.minutes);
-    else setView(reviewUnits.length ? "review" : "weakness");
+    else setView("review");
+  }
+
+  function startSmartReview() {
+    const ranked = shuffle(reviewCards).sort((a, b) => {
+      const score = (card: SmartReviewCard) => {
+        const stat = store.reviewCardStats[card.id];
+        const performance = unitPerformance.find(({ unit }) => unit.id === card.unit.id);
+        return Math.max(0, (stat?.repeat ?? 0) - (stat?.known ?? 0)) * 100 + (performance?.activeMistakes ?? 0) * 60 + (store.bookmarks.includes(card.unit.id) ? 35 : 0);
+      };
+      return score(b) - score(a);
+    });
+    setReviewDeck(ranked.slice(0, Math.min(15, ranked.length)).map((card) => card.id));
+    setReviewCardIndex(0);
+    setReviewCardRevealed(false);
+    setReviewSessionFinished(false);
+    setReviewKnown(0);
+    setReviewRepeat(0);
+  }
+
+  function rateReviewCard(known: boolean) {
+    const cardId = reviewDeck[reviewCardIndex];
+    if (!cardId) return;
+    setStore((prev) => {
+      const stat = prev.reviewCardStats[cardId] ?? { known: 0, repeat: 0, lastReviewed: "" };
+      return {
+        ...prev,
+        reviewCardStats: {
+          ...prev.reviewCardStats,
+          [cardId]: { known: stat.known + (known ? 1 : 0), repeat: stat.repeat + (known ? 0 : 1), lastReviewed: new Date().toISOString() },
+        },
+      };
+    });
+    if (known) setReviewKnown((value) => value + 1);
+    else setReviewRepeat((value) => value + 1);
+    if (reviewCardIndex === reviewDeck.length - 1) setReviewSessionFinished(true);
+    else {
+      setReviewCardIndex((value) => value + 1);
+      setReviewCardRevealed(false);
+    }
+  }
+
+  function closeSmartReview() {
+    setReviewDeck([]);
+    setReviewCardIndex(0);
+    setReviewCardRevealed(false);
+    setReviewSessionFinished(false);
   }
 
   function chooseFocusDuration(minutes: number) {
@@ -538,6 +608,15 @@ export default function Home() {
   const currentPlan = store.dailyPlan?.date === localDateKey() ? store.dailyPlan : undefined;
   const planProgress = currentPlan?.tasks.length ? Math.round((currentPlan.done.length / currentPlan.tasks.length) * 100) : 0;
   const weakestUnits = [...unitPerformance].filter(({ attempts, activeMistakes }) => attempts > 0 || activeMistakes > 0).sort((a, b) => b.activeMistakes - a.activeMistakes || (a.accuracy ?? 101) - (b.accuracy ?? 101)).slice(0, 5);
+  const currentReviewCard = reviewCards.find((card) => card.id === reviewDeck[reviewCardIndex]);
+  const reviewDueCount = reviewCards.filter((card) => {
+    const stat = store.reviewCardStats[card.id];
+    return stat && stat.repeat > stat.known;
+  }).length;
+  const reviewMasteredCount = reviewCards.filter((card) => {
+    const stat = store.reviewCardStats[card.id];
+    return stat && stat.known > stat.repeat;
+  }).length;
   const inStudySection = studySectionViews.includes(view);
   const inExamSection = examSectionViews.includes(view);
   const inProgressSection = progressSectionViews.includes(view);
@@ -652,8 +731,8 @@ export default function Home() {
               <div className="daily-task-list">{currentPlan.tasks.map((task, index) => {
                 const target = task.unitId ? unitPerformance.find(({ unit }) => unit.id === task.unitId) : undefined;
                 const done = currentPlan.done.includes(task.id);
-                const title = target ? target.unit.title : task.kind === "mistakes" ? "Yanlışlarını yeniden çöz" : task.kind === "quiz" ? "Süreli karışık deneme" : reviewUnits.length ? "Tekrar panosunu gözden geçir" : "Zayıflık haritanı kontrol et";
-                const description = target ? `${target.course.short} · Ünite ${target.unitNumber}${target.activeMistakes ? ` · ${target.activeMistakes} aktif yanlış` : target.accuracy !== null ? ` · %${target.accuracy} doğruluk` : " · henüz ölçülmedi"}` : task.kind === "mistakes" ? `${store.mistakes.length} bekleyen soruyu temizle` : task.kind === "quiz" ? "Süre baskısı altında genel seviyeni ölç" : "Eksik kalan başlıkları son kez tara";
+                const title = target ? target.unit.title : task.kind === "mistakes" ? "Yanlışlarını yeniden çöz" : task.kind === "quiz" ? "Süreli karışık deneme" : "Akıllı tekrar kartlarını çöz";
+                const description = target ? `${target.course.short} · Ünite ${target.unitNumber}${target.activeMistakes ? ` · ${target.activeMistakes} aktif yanlış` : target.reviewDue ? ` · ${target.reviewDue} kart tekrar bekliyor` : target.accuracy !== null ? ` · %${target.accuracy} doğruluk` : " · henüz ölçülmedi"}` : task.kind === "mistakes" ? `${store.mistakes.length} bekleyen soruyu temizle` : task.kind === "quiz" ? "Süre baskısı altında genel seviyeni ölç" : "Eksik kalan başlıkları son kez tara";
                 return <article key={task.id} className={done ? "done" : ""} style={{ "--course-color": target?.course.color ?? "#ff705d" } as React.CSSProperties}>
                   <button className="plan-task-check" onClick={() => togglePlanTask(task.id)} aria-label={done ? "Görevi tamamlanmadı işaretle" : "Görevi tamamlandı işaretle"}>{done ? "✓" : index + 1}</button>
                   <div><small>{task.minutes} DAKİKA</small><h2>{title}</h2><p>{description}</p></div>
@@ -738,23 +817,44 @@ export default function Home() {
         {view === "review" && (
           <div className="page review-page">
             <p className="eyebrow">KİŞİSEL ÇALIŞMA ALANI</p>
-            <h1>Tekrar Panosu</h1>
-            <p className="lead">Zorlandığın üniteleri yıldızla, kendi notlarını ekle ve sınav öncesi tekrar edeceğin her şeyi burada topla.</p>
-            <section className="review-summary">
-              <article><span>★</span><div><strong>{store.bookmarks.length}</strong><small>tekrar ünitesi</small></div></article>
-              <article><span>✎</span><div><strong>{Object.values(store.notes).filter((note) => note.trim()).length}</strong><small>kişisel not</small></div></article>
-              <button className="primary" onClick={() => setView("progress")}>Haritadan ünite seç →</button>
-            </section>
-            {reviewUnits.length ? <div className="review-grid">{reviewUnits.map(({ course, unit, unitNumber }) => {
-              const bookmarked = store.bookmarks.includes(unit.id);
-              const note = store.notes[unit.id]?.trim();
-              return <article key={unit.id} className="review-card" style={{ "--course-color": course.color } as React.CSSProperties}>
-                <header><span>{course.code} · ÜNİTE {unitNumber}</span><button onClick={() => toggleBookmark(unit.id)} aria-label={bookmarked ? "Tekrar listesinden çıkar" : "Tekrar listesine ekle"}>{bookmarked ? "★" : "☆"}</button></header>
-                <h2>{unit.title}</h2>
-                {note ? <blockquote>{note}</blockquote> : <p>Bu ünite tekrar listende; kişisel not eklemek için anlatımı aç.</p>}
-                <button className="review-open" onClick={() => openUnit(course, unit)}>Üniteyi aç →</button>
-              </article>;
-            })}</div> : <div className="empty-large"><span>★</span><h2>Tekrar panon boş</h2><p>Bir ünitenin anlatımını açıp “Tekrar listeme ekle” düğmesine bas veya kişisel not yaz.</p><button className="primary" onClick={() => setView("progress")}>Üniteleri incele</button></div>}
+            <h1>Tekrar Merkezi</h1>
+            <p className="lead">Akıllı kartlarla kendini yokla; zorlandığın kartları, yıldızladığın üniteleri ve kişisel notlarını tek yerde yönet.</p>
+            {reviewDeck.length ? <section className="smart-review-session">
+              <header><button onClick={closeSmartReview}>× Oturumu kapat</button><span>{reviewSessionFinished ? "Tamamlandı" : `Kart ${reviewCardIndex + 1} / ${reviewDeck.length}`}</span></header>
+              {!reviewSessionFinished && currentReviewCard ? <>
+                <div className="smart-review-progress"><i style={{ width: `${((reviewCardIndex + 1) / reviewDeck.length) * 100}%` }} /></div>
+                <article className={reviewCardRevealed ? "smart-review-card revealed" : "smart-review-card"} style={{ "--course-color": currentReviewCard.course.color } as React.CSSProperties}>
+                  <div className="smart-card-meta"><span>{currentReviewCard.course.short}</span><span>Ünite {currentReviewCard.unitNumber}</span></div>
+                  <small>{reviewCardRevealed ? "KISA CEVAP" : "SINAV KARTI"}</small>
+                  <h2>{reviewCardRevealed ? currentReviewCard.answer : currentReviewCard.prompt}</h2>
+                  {!reviewCardRevealed && <p>Cevabı zihninden söyle, sonra kartı çevir.</p>}
+                  <button className="smart-card-flip" onClick={() => setReviewCardRevealed((value) => !value)}>{reviewCardRevealed ? "Soruyu tekrar göster" : "Cevabı göster"} ↻</button>
+                </article>
+                {reviewCardRevealed ? <div className="smart-review-rating"><button className="repeat" onClick={() => rateReviewCard(false)}><span>↺</span><strong>Tekrar et</strong><small>Sonraki oturumda öne çıksın</small></button><button className="known" onClick={() => rateReviewCard(true)}><span>✓</span><strong>Biliyorum</strong><small>Kartı güçlendir</small></button></div> : <p className="smart-review-hint">Kendine dürüst cevap ver; zorlandığın kartlar günlük planında öncelik kazanır.</p>}
+              </> : <div className="smart-review-result"><span>✓</span><p className="eyebrow">OTURUM TAMAMLANDI</p><h2>{reviewKnown} kartı biliyorsun, {reviewRepeat} kart tekrar bekliyor.</h2><div><button className="primary" onClick={startSmartReview}>Yeni 15 kart</button><button className="ghost" onClick={closeSmartReview}>Tekrar merkezine dön</button></div></div>}
+            </section> : <>
+              <section className="smart-review-launcher">
+                <div className="smart-review-icon">◇</div>
+                <div><span>AKILLI TEKRAR KARTLARI</span><h2>15 kartla hızlı tekrar yap</h2><p>Sınav kalıplarından hazırlanır; yanlışların, yıldızladığın üniteler ve “Tekrar et” dediğin kartlar önce gelir.</p></div>
+                <div className="smart-review-stats"><article><strong>{reviewDueCount}</strong><small>tekrar bekliyor</small></article><article><strong>{reviewMasteredCount}</strong><small>güçlü kart</small></article></div>
+                <button className="primary" onClick={startSmartReview}>Kartları başlat →</button>
+              </section>
+              <section className="review-summary">
+                <article><span>★</span><div><strong>{store.bookmarks.length}</strong><small>tekrar ünitesi</small></div></article>
+                <article><span>✎</span><div><strong>{Object.values(store.notes).filter((note) => note.trim()).length}</strong><small>kişisel not</small></div></article>
+                <button className="primary" onClick={() => setView("progress")}>Haritadan ünite seç →</button>
+              </section>
+              {reviewUnits.length ? <div className="review-grid">{reviewUnits.map(({ course, unit, unitNumber }) => {
+                const bookmarked = store.bookmarks.includes(unit.id);
+                const note = store.notes[unit.id]?.trim();
+                return <article key={unit.id} className="review-card" style={{ "--course-color": course.color } as React.CSSProperties}>
+                  <header><span>{course.code} · ÜNİTE {unitNumber}</span><button onClick={() => toggleBookmark(unit.id)} aria-label={bookmarked ? "Tekrar listesinden çıkar" : "Tekrar listesine ekle"}>{bookmarked ? "★" : "☆"}</button></header>
+                  <h2>{unit.title}</h2>
+                  {note ? <blockquote>{note}</blockquote> : <p>Bu ünite tekrar listende; kişisel not eklemek için anlatımı aç.</p>}
+                  <button className="review-open" onClick={() => openUnit(course, unit)}>Üniteyi aç →</button>
+                </article>;
+              })}</div> : <div className="empty-large"><span>★</span><h2>Tekrar panon boş</h2><p>Bir ünitenin anlatımını açıp “Tekrar listeme ekle” düğmesine bas veya kişisel not yaz.</p><button className="primary" onClick={() => setView("progress")}>Üniteleri incele</button></div>}
+            </>}
           </div>
         )}
 
