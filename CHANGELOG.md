@@ -2,6 +2,18 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.12.0 - 2026-08-13
+
+### Eklendi
+
+- Kronometre mini penceresine 15, 25 ve 45 dakikalık hızlı süre seçenekleri.
+- Ana ekrandan ve mini pencereden 5–120 dakika arasında özel süre belirleme.
+
+### İyileştirildi
+
+- Odak Sayacı adlandırması Kronometre olarak sadeleştirildi.
+- Her zaman üstte kalan mini pencere, süre seçimleri ve kontroller için genişletildi.
+
 ## v0.11.0 - 2026-08-11
 
 ### Eklendi

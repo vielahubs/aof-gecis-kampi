@@ -48,7 +48,13 @@ const focusMiniStyles = `
   .focus-mini-player header i { color: #8d94a3; font-size: 10px; font-style: normal; }
   .focus-mini-player header i.running { color: #8ee2b4; }
   .focus-mini-player > strong { display: block; margin: 19px 0 5px; font: 900 54px/1 monospace; letter-spacing: -.06em; font-variant-numeric: tabular-nums; }
-  .focus-mini-player > p { min-height: 17px; margin: 0 0 18px; color: #9299a8; font-size: 11px; }
+  .focus-mini-player > p { min-height: 17px; margin: 0 0 13px; color: #9299a8; font-size: 11px; }
+  .focus-mini-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 9px; }
+  .focus-mini-presets button { min-height: 34px; border: 1px solid #3b414d; border-radius: 9px; background: #242933; color: #9da4b2; font-size: 10px; font-weight: 900; }
+  .focus-mini-presets button.active { border-color: #ff705d; background: #3b2928; color: #ff9d91; }
+  .focus-mini-custom { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-bottom: 10px; }
+  .focus-mini-custom input { min-width: 0; height: 35px; border: 1px solid #3b414d; border-radius: 9px; background: #20242d; color: #fff; padding: 0 10px; outline: 0; }
+  .focus-mini-custom button { border: 1px solid #474d5a; border-radius: 9px; background: #303641; color: #fff; padding: 0 12px; font-size: 10px; font-weight: 900; }
   .focus-mini-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .focus-mini-controls button { min-height: 43px; border-radius: 11px; border: 1px solid #404653; background: #2d323d; color: #fff; font-size: 11px; font-weight: 900; }
   .focus-mini-controls button:first-child { border-color: #ff705d; background: #ff705d; }
@@ -87,6 +93,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [lastUnitId, setLastUnitId] = useState<string | null>(null);
   const [focusDuration, setFocusDuration] = useState(25);
+  const [customFocusMinutes, setCustomFocusMinutes] = useState("30");
   const [focusSeconds, setFocusSeconds] = useState(25 * 60);
   const [focusRunning, setFocusRunning] = useState(false);
   const [focusCompleted, setFocusCompleted] = useState(false);
@@ -238,6 +245,14 @@ export default function Home() {
     setFocusEndsAt(null);
   }
 
+  function applyCustomFocusDuration() {
+    const parsed = Number.parseInt(customFocusMinutes, 10);
+    if (!Number.isFinite(parsed)) return;
+    const minutes = Math.min(120, Math.max(5, parsed));
+    setCustomFocusMinutes(String(minutes));
+    chooseFocusDuration(minutes);
+  }
+
   function toggleFocusTimer() {
     if (focusRunning) {
       const remaining = focusEndsAt ? Math.max(0, Math.ceil((focusEndsAt - Date.now()) / 1000)) : focusSeconds;
@@ -270,17 +285,17 @@ export default function Home() {
     let mode: FocusMiniMode = "popup";
     try {
       if (window.documentPictureInPicture) {
-        miniWindow = await window.documentPictureInPicture.requestWindow({ width: 360, height: 280, preferInitialWindowPlacement: true });
+        miniWindow = await window.documentPictureInPicture.requestWindow({ width: 380, height: 410, preferInitialWindowPlacement: true });
         mode = "picture-in-picture";
       } else {
-        miniWindow = window.open("", "aof-focus-mini", "popup,width=360,height=280");
+        miniWindow = window.open("", "aof-focus-mini", "popup,width=380,height=410");
       }
     } catch {
-      miniWindow = window.open("", "aof-focus-mini", "popup,width=360,height=280");
+      miniWindow = window.open("", "aof-focus-mini", "popup,width=380,height=410");
     }
 
     if (!miniWindow) return;
-    miniWindow.document.title = "AÖF Odak Sayacı";
+    miniWindow.document.title = "Kronometre";
     miniWindow.document.documentElement.lang = "tr";
     miniWindow.document.body.replaceChildren();
     miniWindow.document.head.querySelector("style[data-focus-mini]")?.remove();
@@ -394,7 +409,7 @@ export default function Home() {
           <button className={view === "duel" ? "active" : ""} onClick={() => setView("duel")}><span>⚔</span> Canlı Düello</button>
           <button className={view === "search" ? "active" : ""} onClick={() => setView("search")}><span>⌕</span> İçerikte Ara</button>
           <button className={view === "review" ? "active" : ""} onClick={() => setView("review")}><span>★</span> Tekrar Panosu <em>{reviewUnits.length}</em></button>
-          <button className={view === "focus" ? "active" : ""} onClick={() => setView("focus")}><span>◷</span> Odak Sayacı</button>
+          <button className={view === "focus" ? "active" : ""} onClick={() => setView("focus")}><span>◷</span> Kronometre</button>
           <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")}><span>▦</span> İlerleme Haritası</button>
           <button className={view === "mistakes" ? "active" : ""} onClick={() => setView("mistakes")}><span>↺</span> Yanlışlarım <em>{store.mistakes.length}</em></button>
           <button onClick={() => startQuiz()}><span>▶</span> Karışık Deneme</button>
@@ -530,11 +545,12 @@ export default function Home() {
         {view === "focus" && (
           <div className="page focus-page">
             <p className="eyebrow">DİKKATİ DAĞITMADAN ÇALIŞ</p>
-            <h1>Odak Sayacı</h1>
+            <h1>Kronometre</h1>
             <p className="lead">Bir süre seç, tek üniteye odaklan ve tamamlanan çalışma oturumlarını cihazında biriktir.</p>
             <div className="focus-layout">
               <section className="focus-timer-panel">
-                <div className="focus-presets" aria-label="Odak süresi seçimi">{[15, 25, 45].map((minutes) => <button key={minutes} className={focusDuration === minutes ? "active" : ""} onClick={() => chooseFocusDuration(minutes)}>{minutes} dk</button>)}</div>
+                <div className="focus-presets" aria-label="Kronometre süresi seçimi">{[15, 25, 45].map((minutes) => <button key={minutes} className={focusDuration === minutes ? "active" : ""} onClick={() => chooseFocusDuration(minutes)}>{minutes} dk</button>)}</div>
+                <div className="focus-custom-duration"><label htmlFor="custom-focus-minutes">Özel süre</label><div><input id="custom-focus-minutes" type="number" min="5" max="120" value={customFocusMinutes} onChange={(event) => setCustomFocusMinutes(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") applyCustomFocusDuration(); }} aria-label="Özel kronometre süresi, dakika" /><span>dk</span><button type="button" onClick={applyCustomFocusDuration}>Uygula</button></div><small>5–120 dakika arasında kendi süreni belirle.</small></div>
                 <div className="focus-ring" style={{ "--focus-progress": `${focusProgress * 3.6}deg` } as React.CSSProperties}><div><span>{focusRunning ? "ODAKLAN" : focusCompleted ? "TAMAMLANDI" : "HAZIR"}</span><strong>{focusClock}</strong><small>{focusProgress}% tamamlandı</small></div></div>
                 {focusCompleted && <div className="focus-success">✓ Odak oturumu kaydedildi. Kısa bir mola ver.</div>}
                 <div className="focus-actions"><button className="primary" onClick={toggleFocusTimer}>{focusRunning ? "Duraklat" : focusSeconds === focusDuration * 60 ? "Başlat" : focusSeconds === 0 ? "Yeniden başlat" : "Devam et"}</button><button className="ghost" onClick={resetFocusTimer}>Sıfırla</button><button className="ghost focus-float-button" onClick={openFocusMiniWindow}>{focusMiniWindow && !focusMiniWindow.closed ? "Mini pencere açık" : "↗ Mini pencereye aç"}</button></div>
@@ -685,9 +701,11 @@ export default function Home() {
       </section>
       {focusMiniRoot && createPortal(
         <div className="focus-mini-player">
-          <header><span>AÖF ODAK SAYACI</span><i className={focusRunning ? "running" : ""}>{focusRunning ? "● ÇALIŞIYOR" : focusCompleted ? "✓ TAMAMLANDI" : "DURAKLATILDI"}</i></header>
+          <header><span>KRONOMETRE</span><i className={focusRunning ? "running" : ""}>{focusRunning ? "● ÇALIŞIYOR" : focusCompleted ? "✓ TAMAMLANDI" : "DURAKLATILDI"}</i></header>
           <strong>{focusClock}</strong>
           <p>{focusRunning ? "Süre arka planda doğru biçimde ilerliyor." : focusCompleted ? "Oturum kaydedildi. Kısa bir mola verebilirsin." : `${focusDuration} dakikalık odak oturumu.`}</p>
+          <div className="focus-mini-presets" aria-label="Kronometre süresi seçimi">{[15, 25, 45].map((minutes) => <button key={minutes} className={focusDuration === minutes ? "active" : ""} onClick={() => chooseFocusDuration(minutes)}>{minutes} dk</button>)}</div>
+          <div className="focus-mini-custom"><input type="number" min="5" max="120" value={customFocusMinutes} onChange={(event) => setCustomFocusMinutes(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") applyCustomFocusDuration(); }} aria-label="Özel kronometre süresi, dakika" /><button type="button" onClick={applyCustomFocusDuration}>Özel süre</button></div>
           <div className="focus-mini-controls"><button onClick={toggleFocusTimer}>{focusRunning ? "Duraklat" : focusSeconds === 0 ? "Yeniden başlat" : "Başlat / devam et"}</button><button onClick={resetFocusTimer}>Sıfırla</button></div>
           <small>{focusMiniMode === "picture-in-picture" ? "Her zaman üstte kalan mini pencere" : "Tarayıcı küçük pencere modu"}</small>
         </div>,
