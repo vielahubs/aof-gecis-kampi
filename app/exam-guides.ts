@@ -414,3 +414,50 @@ export const examGuides: Record<string, ExamGuide> = {
     "Tehdit kapıyı zorlar, açıklık kapının zayıflığıdır, risk içeri girip zarar verme ihtimalidir."
   )
 };
+
+const patternAnswers: Record<string, string[]> = {
+  "TAR201U-1": ["İlk anayasa 1876 Kanun-ı Esasi; ilk meclisli dönem I. Meşrutiyet'tir.", "Tanzimat hak ve güvence, Islahat gayrimüslim hakları, Kanun-ı Esasi anayasal yönetimdir.", "Olayla doğrudan ilgisi olmayan veya dönem dışı seçenek elenir."],
+  "TAR201U-2": ["Trablusgarp–Uşi; I. Dünya Savaşı–Mondros; parçalama tasarısı–Sevr.", "Mondros 7. madde işgale zemin hazırladı; Sevr Osmanlı'yı parçaladı.", "Savaşın tarihine, taraflarına veya doğrudan sonucuna uymayan seçenek elenir."],
+  "TAR201U-3": ["Yararlı millî cemiyetler destekler; zararlı ve azınlık cemiyetleri desteklemez. Yararlı cemiyetler Sivas'ta birleşti.", "Amasya gerekçe-yöntem; Erzurum bölgesel toplanıp ulusal karar; Sivas ulusal kongre ve birleşmedir.", "Ulusal egemenlik ilk kez Amasya Genelgesi'ndeki ‘milletin azim ve kararı’ sözüyle açıkça vurgulandı."],
+  "TAR201U-4": ["TBMM millî iradeye dayanır, yasama-yürütmeyi toplar ve İstanbul'a bağlı değildir.", "23 Nisan 1920 TBMM; 20 Ocak 1921 Teşkilat-ı Esasiye Kanunu'dur.", "Kuva-yı Milliye işgali yavaşlattı; disiplinsizliği düzenli orduyu gerekli kıldı."],
+  "TAR201U-5": ["‘Hattı müdafaa yoktur, sathı müdafaa vardır’ sözü Sakarya'ya aittir.", "Doğu–Gümrü; Batı–Mudanya; Güney–Ankara Antlaşması eşleşir.", "I. İnönü → II. İnönü → Kütahya-Eskişehir → Sakarya → Büyük Taarruz → Mudanya."],
+  "TAR201U-6": ["Kapitülasyonlar ve Ermeni yurdu reddedildi; tam bağımsızlıktan taviz verilmedi.", "Mudanya ateşkes, Lozan barış antlaşmasıdır.", "Kapitülasyonlar çözüldü; Musul ertelendi, Boğazlar 1936 Montrö ile değişti."],
+  "TAR201U-7": ["Gerçek nedenlerle ilgisiz veya olaydan sonra gerçekleşen seçenek elenir.", "Terakkiperver 1924; Serbest Cumhuriyet Fırkası ve Menemen 1930'dur.", "Şeyh Sait İsyanı ve Menemen Olayı rejime yönelik gelişmelerdir."],
+  "TAR201U-8": ["Musul–İngiltere/Irak; etabli–Yunanistan; Küçük Ağrı–İran; Hatay–Fransa/Suriye.", "Balkan Antantı batı, Sadabat Paktı doğu güvenliği; Montrö Boğaz egemenliğidir.", "Gerçekçilik, barışçılık ve tam bağımsızlık temel dış politika ilkeleridir."],
+  "TAR202U-1": ["Darülbedayi İstanbul Şehir Tiyatrosu; Darülelhan İstanbul Konservatuvarı oldu.", "Tevhid eğitim birliği; Medeni Kanun hukuk-aile; Teşvik-i Sanayi üretim desteğidir.", "Tevhid eğitim, Medeni Kanun hukuk, Harf kültür, İzmir İktisat Kongresi ekonomidir."],
+  "TAR202U-2": ["Nutuk Atatürk'ün eseridir; başka yazara ait eser seçeneği elenir.", "Egemenlik–cumhuriyetçilik; eşitlik–halkçılık; ekonomi–devletçilik; yenilik–inkılapçılık.", "Trablusgarp, Çanakkale, Kafkas ve Suriye-Filistin cephelerinde görev yaptı."],
+  "TAR202U-3": ["Millî Korunma, Varlık Vergisi ve karne savaş ekonomisidir; Marshall savaş sonrasıdır.", "Truman güvenlik yardımı; Marshall ekonomik yardımdır.", "1945 Millî Kalkınma → 1946 Demokrat Parti ve seçim → 1950 iktidar değişimi."],
+  "TAR202U-4": ["Traktörleşme tarım; kara yolu ulaşım; yabancı sermaye ekonomi alanındadır.", "6–7 Eylül, Kıbrıs gerilimi ortamında İstanbul Rumlarına yönelik saldırılardır.", "1950–1960 DP dönemine ait olmayan gelişme seçilir."],
+  "TAR202U-5": ["1961 Anayasası kuvvetler ayrılığı, Anayasa Mahkemesi ve çift meclis getirdi.", "27 Mayıs 1960 darbe; 12 Mart 1971 muhtıra; 12 Eylül 1980 darbedir.", "Siyasi şiddet, istikrarsızlık ve ekonomik kriz darbeyi hazırlayan nedenlerdir."],
+  "TAR202U-6": ["24 Ocak dışa açık, ihracata dayalı, piyasa ağırlıklı ekonomi programıdır.", "Faiz serbestliği ve denetimsiz banker büyümesi banker krizine yol açtı.", "Özal dışa açılma, ekonomik karşılıklı bağımlılık ve aktif bölgesel ilişkilere önem verdi."],
+  "TAR202U-7": ["Yeşil Kart DYP–SHP; Gümrük Birliği 1996; 28 Şubat Refah–Yol dönemindedir.", "Kardak krizi Türkiye ile Yunanistan arasında yaşandı.", "Gümrük Birliği, 28 Şubat, Kardak, AGİT ve 2001 krizi bu dönemdedir."],
+  "TAR202U-8": ["367 krizi 2007 cumhurbaşkanı seçimi toplantı yeter sayısıyla ilgilidir.", "2009 Nahçıvan Antlaşması Türk Konseyi'nin temelidir.", "1 Mart 2003; 367 krizi 2007; Nahçıvan 2009; 15 Temmuz 2016; değişiklik 2017."],
+  "WTK201U-1": ["LAMP: Linux, Apache, MySQL, PHP; Windows bileşen değildir.", "İçerik üretme, düzenleme ve yayımlama işlevi İYS'yi anlatır.", "Portal, kurumsal, e-ticaret ve öğrenme İYS türleridir."],
+  "WTK201U-2": ["En yetkili yönetici; editör yayımlar, yazar içerik üretir.", "Yönetici ayar-yetki; editör kontrol-yayın; yazar içerik üretimi yapar.", "Sunucu/veritabanı → izinler → kurulum → tema/eklenti → kullanıcı ve yayın ayarı."],
+  "WTK201U-3": ["phpMyAdmin veritabanı; Ortam dosya; TinyMCE düzenleyici yönetir.", "Yazılar tarih-kategori akışında; sayfalar kalıcı içeriktir.", "TinyMCE Advanced düzenleyiciyi geliştiren eklentidir."],
+  "WTK201U-4": ["Bileşen ana iş, modül çevresel kutu, eklenti olay temelli görevdir.", "İşletim sistemi, PHP ve veritabanı sürümü Sistem Bilgileri'nde görülür.", "Yardım dış kaynağa gider; modüller arşiv, giriş veya ilişkili makale gösterebilir."],
+  "WTK201U-5": ["Taksonomi sözlük ve terimlerden oluşur.", "Günlüklere Raporlar sekmesinden erişilir.", "İçerik türü şablon, alan özellik, node tek içerik kaydıdır."],
+  "WTK201U-6": ["db.php bağlantı; .htaccess yönlendirme; public/index.php web girişidir.", "Ayar config/db.php; marka rebrand; giriş public/index.php konumundadır.", "Tablo ön eki tablePrefix alanındadır."],
+  "WTK201U-7": ["Süper kullanıcı tüm kurulumu; yönetici yalnız kendi portalını yönetir.", "Sayfa → hücre/pane → modül → içerik ve izin ayarları.", "HTTPS 443; HTTP 80 portunu kullanır."],
+  "WTK201U-8": ["Hassas veri için dahili; düşük teknik yük için bulut barındırma uygundur.", "Önbellek yakında tutar; yük dengeleme istekleri dağıtır.", "Makinenin veriyi anlamlandırması anlamsal webdir."],
+  "WTK210U-1": ["HTTP web, FTP dosya, SMTP e-posta gönderimiyle ilgilidir.", ".com ticari/genel, .gov kamu, .edu eğitim içindir.", "HTML-CSS-JS istemci; PHP, ASP.NET, Python ve Ruby sunucu tarafıdır."],
+  "WTK210U-2": ["echo çıktı verir; değişken $ ile başlar; kod sırayla işletilir.", "Fonksiyon tekrar kullanılan kodu isimli blokta toplar.", "Yapılandırma php.ini; ayarları gösteren phpinfo()'dur."],
+  "WTK210U-3": ["push sona ekler, pop sondan çıkarır, merge birleştirir.", "GET URL'de, POST gövdede taşır; POST şifreleme değildir.", "MySQLi sırası sunucu, kullanıcı, parola, veritabanıdır."],
+  "WTK210U-4": ["onload yüklenince, onclick tıklayınca, ondblclick çift tıklayınca çalışır.", "! tersler, && ikisi de doğruysa, || biri doğruysa true verir.", "alert uyarı gösterir; DOM belgeyi nesne ağacı olarak temsil eder."],
+  "WTK210U-5": ["css veri eklemez; append/prepend içeri, before/after dışarı ekler.", "click tıklama, dblclick çift tıklama, keyup tuş bırakmadır.", "Ajax sayfayı yenilemeden sunucuyla veri alışverişidir."],
+  "WTK210U-6": ["i=0; i<5; i++ döngüsü 0–4 arasında 5 kez yazar.", "Geçerli örnek: int[] sayilar = {1, 2, 3};", "private sınıf içi, protected sınıf ve türeyenler, public dış erişimdir."],
+  "WTK210U-7": ["len tür değil fonksiyondur; int, float, string ve boolean türdür.", "sep değerler arasına yazılan ayırıcıdır.", "Model veri, view işlem, template ekran; ORM nesneyle sorgudur."],
+  "WTK210U-8": ["push ekler, pop çıkarır, reverse tersine çevirir; sırayla uygula.", "length uzunluk, downcase küçük harf, reverse ters çevirir.", "Rails MVC kullanır; DRY tekrarları azaltır."],
+  "YBS302U-1": ["Merkezî cihaz yıldız, kapalı çevrim halka, çoklu bağlantı örgüdür.", "İlk paket anahtarlamalı ağ ARPANET'tir.", "Repeater, switch ve router ağ cihazıdır; ağ görevi olmayan aygıt elenir."],
+  "YBS302U-2": ["Arıza-alarm hata; hız-kapasite performans; ayar değişikliği yapılandırmadır.", "Manager yönetir, agent bilgi sunar, MIB nesneleri tutar.", "GET okur, SET değiştirir, TRAP olay bildirir."],
+  "YBS302U-3": ["AES 128–10, 192–12, 256–14 turdur.", "Aynı gizli anahtar simetrik; harf öteleme Sezar şifresidir.", "Açık metin özgün veri, şifreli metin algoritma çıktısıdır."],
+  "YBS302U-4": ["Dijital imza gizlilik sağlamaz; doğrulama, bütünlük ve inkâr edememe sağlar.", "Araya girip mesajı değiştiren saldırı ortadaki adamdır.", "İmza kimlik doğrulama, bütünlük ve inkâr edememe sağlar."],
+  "YBS302U-5": ["Sertifikada açık anahtar bulunur; özel anahtar bulunmaz.", "Ses-imza davranışsal; retina-parmak izi-el geometrisi fizyolojiktir.", "Güçlü parola uzun, benzersiz ve tahmini zordur."],
+  "YBS302U-6": ["HTTPS = HTTP + TLS.", "Biçimleme, sıkıştırma ve şifreleme sunum katmanıdır.", "FCS iletim hatasını tespit eder."],
+  "YBS302U-7": ["Normal postaya spam denmesi yanlış pozitif; spam'e normal denmesi yanlış negatiftir.", "Sahte banka e-postasıyla bilgi çalma phishing'dir.", "SPF yetkilendirir, DKIM imzalar, DMARC politika bildirir."],
+  "YBS302U-8": ["Ağda çoğalan solucan; yararlı görünen Truva atı; dosyaya bağlanan virüstür.", "Firewall trafiği süzer; antivirüs zararlı yazılımı bulur.", "Risk, tehdidin açıklıktan yararlanıp zarar verme olasılığı ve etkisidir."]
+};
+
+export function getPatternAnswer(unitId: string, patternIndex: number) {
+  return patternAnswers[unitId]?.[patternIndex] ?? "Bu kalıbın cevabı ünitenin kısa tekrar bölümünde özetlenmiştir.";
+}

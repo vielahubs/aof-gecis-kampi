@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Course, Question, Unit, courses, questions } from "./study-data";
-import { examGuides } from "./exam-guides";
+import { examGuides, getPatternAnswer } from "./exam-guides";
 import { historyDeepDives } from "./history-deep-dives";
 import LiveDuel from "./live-duel";
 
@@ -569,7 +569,7 @@ function UnitStudy({ course, unit, completed, bookmarked, note, onToggle, onBook
           <div className="critical-facts"><h3>Kritik bilgiler</h3><ol>{unit.keyPoints.map((point, index) => <li key={point}><span>{index + 1}</span><p>{point}</p></li>)}</ol></div>
           <div className="keyword-box"><h3>Soruda görünce tanı</h3><div>{guide.signals.map((signal) => <span key={signal}>{signal}</span>)}</div><small>Bu ifadeler soru kökünde veya seçeneklerde geçtiğinde ünitenin ilgili kavramını hatırla.</small></div>
         </div>
-        <div className="question-patterns"><h3>Soru kalıpları</h3><div>{guide.patterns.map((pattern, index) => <p key={pattern}><span>{index + 1}</span>{pattern}</p>)}</div></div>
+        <div className="question-patterns"><h3>Soru kalıpları ve kısa cevapları</h3><div>{guide.patterns.map((pattern, index) => <article key={pattern}><span>{index + 1}</span><div><strong>{pattern}</strong><small><b>CEVAP:</b> {getPatternAnswer(unit.id, index)}</small></div></article>)}</div></div>
         <div className="quick-recall"><div><span>⚠ KARIŞTIRMA</span><p>{guide.trap}</p></div><div><span>⏱ 2 DAKİKALIK TEKRAR</span><p>{guide.hook}</p></div></div>
         <div className="unit-check-action"><div><strong>Kendini kontrol et</strong><small>{unitQuestionCount ? `Bu ünite için ${unitQuestionCount} özgün kontrol sorusu hazır.` : "Bu üniteye özel soru henüz yok; ders denemesinden devam edebilirsin."}</small></div><button className="primary" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Ünite sorusunu çöz" : "Ders denemesini aç"} →</button></div>
       </section>
