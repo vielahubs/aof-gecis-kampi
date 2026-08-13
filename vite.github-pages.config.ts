@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
   base: "/aof-gecis-kampi/",
   root: "github-pages",
-  publicDir: false,
+  publicDir: "../public",
   plugins: [react()],
   build: {
     outDir: "../dist-pages",

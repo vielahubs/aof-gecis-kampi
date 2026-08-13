@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Course, Question, Unit, courses, questions } from "./study-data";
 import { examGuides, getPatternAnswer } from "./exam-guides";
 import { historyDeepDives } from "./history-deep-dives";
-import LiveDuel from "./live-duel";
+
+const LiveDuel = lazy(() => import("./live-duel"));
 
 type View = "dashboard" | "daily-plan" | "weakness" | "timed-exam" | "quiz-history" | "duel" | "search" | "review" | "focus" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
@@ -95,9 +96,69 @@ function localDateKey() {
 }
 
 function dateKeyOffset(offset: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + offset);
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(date);
+  const date = new Date(`${localDateKey()}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function nonNegativeNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function normalizeQuestionStats(value: unknown): Record<string, QuestionStat> {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(Object.entries(value).flatMap(([id, stat]) => isRecord(stat) ? [[id, {
+    answered: nonNegativeNumber(stat.answered),
+    correct: nonNegativeNumber(stat.correct),
+    wrong: nonNegativeNumber(stat.wrong),
+    blank: nonNegativeNumber(stat.blank),
+  } satisfies QuestionStat]] : []));
+}
+
+function normalizeReviewCardStats(value: unknown): Record<string, ReviewCardStat> {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(Object.entries(value).flatMap(([id, stat]) => isRecord(stat) ? [[id, {
+    known: nonNegativeNumber(stat.known),
+    repeat: nonNegativeNumber(stat.repeat),
+    lastReviewed: typeof stat.lastReviewed === "string" ? stat.lastReviewed : "",
+  } satisfies ReviewCardStat]] : []));
+}
+
+function normalizeQuizHistory(value: unknown): QuizAttempt[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((attempt) => {
+    if (!isRecord(attempt) || typeof attempt.id !== "string" || typeof attempt.date !== "string" || typeof attempt.label !== "string") return [];
+    return [{
+      id: attempt.id,
+      date: Number.isNaN(Date.parse(attempt.date)) ? new Date().toISOString() : attempt.date,
+      label: attempt.label,
+      questionCount: nonNegativeNumber(attempt.questionCount),
+      correct: nonNegativeNumber(attempt.correct),
+      wrong: nonNegativeNumber(attempt.wrong),
+      blank: nonNegativeNumber(attempt.blank),
+      net: typeof attempt.net === "number" && Number.isFinite(attempt.net) ? attempt.net : 0,
+      score: Math.min(100, nonNegativeNumber(attempt.score)),
+      timed: attempt.timed === true,
+    } satisfies QuizAttempt];
+  }).slice(0, 50);
+}
+
+function normalizeDailyPlan(value: unknown): DailyPlan | undefined {
+  if (!isRecord(value) || value.date !== localDateKey() || !Array.isArray(value.tasks)) return undefined;
+  const allowedKinds: DailyPlanTask["kind"][] = ["unit", "mistakes", "quiz", "review"];
+  const tasks = value.tasks.flatMap((task) => {
+    if (!isRecord(task) || typeof task.id !== "string" || !allowedKinds.includes(task.kind as DailyPlanTask["kind"])) return [];
+    return [{ id: task.id, kind: task.kind as DailyPlanTask["kind"], unitId: typeof task.unitId === "string" ? task.unitId : undefined, minutes: Math.max(1, nonNegativeNumber(task.minutes)) }];
+  });
+  return { date: value.date, minutes: Math.max(1, nonNegativeNumber(value.minutes)), tasks, done: stringArray(value.done).filter((id) => tasks.some((task) => task.id === id)) };
 }
 
 function addStudyActivity(state: StoredState, date = localDateKey()): StoredState {
@@ -217,6 +278,7 @@ export default function Home() {
   const audioIndexRef = useRef(0);
   const audioRateRef = useRef(1);
   const audioSessionRef = useRef(0);
+  const quizFinalizedRef = useRef(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -225,20 +287,20 @@ export default function Home() {
         try {
           const parsed = JSON.parse(saved) as Partial<StoredState>;
           const parsedNotes = parsed.notes && typeof parsed.notes === "object" ? Object.fromEntries(Object.entries(parsed.notes).filter((entry): entry is [string, string] => typeof entry[1] === "string")) : {};
-          const parsedQuestionStats = parsed.questionStats && typeof parsed.questionStats === "object" ? parsed.questionStats : {};
-          const parsedReviewCardStats = parsed.reviewCardStats && typeof parsed.reviewCardStats === "object" ? parsed.reviewCardStats : {};
-          const parsedQuizHistory = Array.isArray(parsed.quizHistory) ? parsed.quizHistory : [];
-          const parsedActivityDates = Array.isArray(parsed.activityDates) ? parsed.activityDates.filter((date): date is string => typeof date === "string") : [];
-          const parsedDailyPlan = parsed.dailyPlan && typeof parsed.dailyPlan === "object" && parsed.dailyPlan.date === localDateKey() ? parsed.dailyPlan : undefined;
+          const parsedQuestionStats = normalizeQuestionStats(parsed.questionStats);
+          const parsedReviewCardStats = normalizeReviewCardStats(parsed.reviewCardStats);
+          const parsedQuizHistory = normalizeQuizHistory(parsed.quizHistory);
+          const parsedActivityDates = stringArray(parsed.activityDates).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date));
+          const parsedDailyPlan = normalizeDailyPlan(parsed.dailyPlan);
           setStore({
-            completed: Array.isArray(parsed.completed) ? parsed.completed : [],
-            mistakes: Array.isArray(parsed.mistakes) ? parsed.mistakes : [],
-            answered: typeof parsed.answered === "number" ? parsed.answered : 0,
-            correct: typeof parsed.correct === "number" ? parsed.correct : 0,
-            bookmarks: Array.isArray(parsed.bookmarks) ? parsed.bookmarks : [],
+            completed: stringArray(parsed.completed),
+            mistakes: stringArray(parsed.mistakes),
+            answered: nonNegativeNumber(parsed.answered),
+            correct: nonNegativeNumber(parsed.correct),
+            bookmarks: stringArray(parsed.bookmarks),
             notes: parsedNotes,
-            focusMinutes: typeof parsed.focusMinutes === "number" ? parsed.focusMinutes : 0,
-            focusSessions: typeof parsed.focusSessions === "number" ? parsed.focusSessions : 0,
+            focusMinutes: nonNegativeNumber(parsed.focusMinutes),
+            focusSessions: nonNegativeNumber(parsed.focusSessions),
             questionStats: parsedQuestionStats,
             reviewCardStats: parsedReviewCardStats,
             quizHistory: parsedQuizHistory,
@@ -296,8 +358,9 @@ export default function Home() {
     const syncClock = () => {
       const remaining = Math.max(0, Math.ceil((quizEndsAt - Date.now()) / 1000));
       setQuizSeconds(remaining);
-      if (remaining === 0 && !finished) {
+      if (remaining === 0 && !finished && !quizFinalizedRef.current) {
         finished = true;
+        quizFinalizedRef.current = true;
         const unanswered = quiz.filter((question) => quizPicks[question.id] === undefined);
         setQuizBlank((value) => value + unanswered.length);
         setQuizBlankIds(unanswered.map((question) => question.id));
@@ -691,6 +754,7 @@ export default function Home() {
     setShowResult(false);
     setQuizSeconds(0);
     setQuizEndsAt(null);
+    quizFinalizedRef.current = false;
     setQuizOrigin(mistakeOnly
       ? { kind: "mistakes" }
       : courseCode && unitNumber
@@ -721,10 +785,12 @@ export default function Home() {
     setQuizOrigin({ kind: "timed", courseCode, duration });
     setQuizSeconds(duration * 60);
     setQuizEndsAt(Date.now() + duration * 60 * 1000);
+    quizFinalizedRef.current = false;
     setView("quiz");
   }
 
   function leaveQuiz() {
+    quizFinalizedRef.current = true;
     setQuizEndsAt(null);
     if (quizOrigin.kind === "unit") {
       const course = courses.find((item) => item.code === quizOrigin.courseCode);
@@ -798,7 +864,8 @@ export default function Home() {
   }
 
   function finishQuiz() {
-    if (showResult) return;
+    if (showResult || quizFinalizedRef.current) return;
+    quizFinalizedRef.current = true;
     const unanswered = quiz.filter((question) => quizPicks[question.id] === undefined);
     setQuizBlank(unanswered.length);
     setQuizBlankIds(unanswered.map((question) => question.id));
@@ -845,7 +912,7 @@ export default function Home() {
       <aside className="sidebar">
         <button className="brand" onClick={() => setView("dashboard")} aria-label="Ana sayfa">
           <span className="brand-mark">A</span>
-          <span><strong>AÖF Kampı</strong><small>22 Ağustos 2026</small></span>
+          <span><strong>AÖF Kampı</strong><small>v1.0 · 22 Ağustos 2026</small></span>
         </button>
 
         <nav className="main-nav" aria-label="Ana menü">
@@ -1023,7 +1090,7 @@ export default function Home() {
           </div>
         )}
 
-        {view === "duel" && <LiveDuel />}
+        {view === "duel" && <Suspense fallback={<div className="page"><div className="empty-large"><span>⚔</span><h2>Canlı Düello hazırlanıyor</h2><p>Güvenli oyun bağlantısı yükleniyor…</p></div></div>}><LiveDuel /></Suspense>}
 
         {view === "search" && (
           <div className="page search-page">

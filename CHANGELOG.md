@@ -2,6 +2,21 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v1.0.0 - 2026-08-13
+
+### Kararlı sürüm
+
+- Projenin ilk kararlı sürümü olarak sürüm dizisi v1.0.0'a geçirildi. Sonraki özellik sürümleri v1.1.0, v1.2.0; hata düzeltmeleri v1.0.1 biçiminde ilerleyecek.
+- Beş ders, 40 ünite, 40 ayrıntılı anlatım, 120 tekrar kartı ve bütün çalışma akışları veri bütünlüğü testleriyle doğrulandı.
+- Soru havuzu her derste 10 soru olacak biçimde 50 soruya tamamlandı; daha önce sorusu bulunmayan beş üniteye de doğrudan soru desteği eklendi.
+- Denemelerin süre dolmasıyla manuel bitirmenin aynı anda gerçekleşmesi durumunda geçmişe iki kez kaydolmasını önleyen tek sonuçlandırma kilidi eklendi.
+- Eski veya bozulmuş yerel kayıtların soru istatistiklerini, tekrar kartlarını, deneme geçmişini ve günlük planı bozması önlendi.
+- Çalışma serisinin gün hesabı Türkiye saatine göre ve tarih sınırlarında kararlı çalışacak biçimde düzeltildi.
+- Canlı Düello sürüm etiketi güncellendi; oda kodu panoya kopyalanamazsa anlaşılır hata ve elle paylaşılacak kod gösteriliyor.
+- GitHub Pages çıktısına favicon ve tarayıcı tema rengi eklendi.
+- Canlı Düello ve Supabase bağlantısı ayrı bir JavaScript parçasına bölünerek normal çalışma ekranlarının ilk yükü hafifletildi.
+- Otomatik test paketi 5 ders, 40 ünite, 50 soru, 120 kart, cevap aralıkları, kaynak bağlantıları ve içerik eşleşmelerini denetleyecek biçimde genişletildi.
+
 ## v0.19.0 - 2026-08-13
 
 ### İyileştirildi
