@@ -2,12 +2,14 @@
 
 22 Ağustos 2026 AÖF yaz okulu sınavları için hazırlanmış, tarayıcıda çalışan çalışma takip uygulaması.
 
-Güncel sürüm: **v0.17.0** · [Değişiklik günlüğü](CHANGELOG.md)
+Güncel sürüm: **v0.18.0** · [Değişiklik günlüğü](CHANGELOG.md)
 
 ## Özellikler
 
 - Beş ders ve toplam 40 ünite için çalışma takibi
 - Ders bazında ve karışık özgün denemeler
+- Son 50 denemenin doğru, yanlış, boş, net ve puan bilgilerini saklayan deneme geçmişi
+- Günlük çalışma etkinliğini ve en uzun devamlılığı gösteren çalışma serisi
 - 30, 60 ve 120 dakikaya göre öncelikli görevler oluşturan günlük çalışma planı
 - Sınav kalıplarından oluşan, “Biliyorum / Tekrar et” geri bildirimli akıllı tekrar kartları
 - Doğru, yanlış ve boş cevapları ünite bazında gösteren zayıflık haritası

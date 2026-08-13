@@ -7,7 +7,7 @@ import { examGuides, getPatternAnswer } from "./exam-guides";
 import { historyDeepDives } from "./history-deep-dives";
 import LiveDuel from "./live-duel";
 
-type View = "dashboard" | "daily-plan" | "weakness" | "timed-exam" | "duel" | "search" | "review" | "focus" | "progress" | "course" | "quiz" | "mistakes" | "sources";
+type View = "dashboard" | "daily-plan" | "weakness" | "timed-exam" | "quiz-history" | "duel" | "search" | "review" | "focus" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
 type FocusMiniMode = "picture-in-picture" | "popup";
 type DocumentPictureInPicture = {
@@ -30,6 +30,7 @@ type ReviewCardStat = { known: number; repeat: number; lastReviewed: string };
 type SmartReviewCard = { id: string; course: Course; unit: Unit; unitNumber: number; prompt: string; answer: string };
 type DailyPlanTask = { id: string; kind: "unit" | "mistakes" | "quiz" | "review"; unitId?: string; minutes: number };
 type DailyPlan = { date: string; minutes: number; tasks: DailyPlanTask[]; done: string[] };
+type QuizAttempt = { id: string; date: string; label: string; questionCount: number; correct: number; wrong: number; blank: number; net: number; score: number; timed: boolean };
 type StoredState = {
   completed: string[];
   mistakes: string[];
@@ -41,13 +42,15 @@ type StoredState = {
   focusSessions: number;
   questionStats: Record<string, QuestionStat>;
   reviewCardStats: Record<string, ReviewCardStat>;
+  quizHistory: QuizAttempt[];
+  activityDates: string[];
   dailyPlan?: DailyPlan;
 };
 
-const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {}, focusMinutes: 0, focusSessions: 0, questionStats: {}, reviewCardStats: {} };
+const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {}, focusMinutes: 0, focusSessions: 0, questionStats: {}, reviewCardStats: {}, quizHistory: [], activityDates: [] };
 const lastUnitStorageKey = "aof-gecis-kampi-last-unit";
 const studySectionViews: View[] = ["daily-plan", "focus", "review", "search"];
-const examSectionViews: View[] = ["timed-exam", "quiz", "mistakes", "duel"];
+const examSectionViews: View[] = ["timed-exam", "quiz-history", "quiz", "mistakes", "duel"];
 const progressSectionViews: View[] = ["progress", "weakness", "sources"];
 const focusMiniStyles = `
   :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; background: #171a21; }
@@ -91,12 +94,63 @@ function localDateKey() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
 }
 
+function dateKeyOffset(offset: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(date);
+}
+
+function addStudyActivity(state: StoredState, date = localDateKey()): StoredState {
+  return state.activityDates.includes(date) ? state : { ...state, activityDates: [...state.activityDates, date].slice(-400) };
+}
+
+function calculateStreaks(dates: string[]) {
+  const unique = [...new Set(dates)].sort();
+  let longest = 0;
+  let run = 0;
+  let previous = Number.NaN;
+  unique.forEach((key) => {
+    const day = Date.parse(`${key}T00:00:00Z`) / 86_400_000;
+    run = day - previous === 1 ? run + 1 : 1;
+    longest = Math.max(longest, run);
+    previous = day;
+  });
+  const active = new Set(unique);
+  let current = 0;
+  const startOffset = active.has(localDateKey()) ? 0 : active.has(dateKeyOffset(-1)) ? -1 : 1;
+  if (startOffset <= 0) {
+    for (let offset = startOffset; active.has(dateKeyOffset(offset)); offset -= 1) current += 1;
+  }
+  return { current, longest };
+}
+
 function weaknessLevel(accuracy: number | null, activeMistakes: number) {
   if (accuracy === null && activeMistakes === 0) return { key: "unknown", label: "Veri yok" };
   if (activeMistakes > 0 || (accuracy !== null && accuracy < 50)) return { key: "critical", label: "Öncelikli" };
   if (accuracy !== null && accuracy < 70) return { key: "developing", label: "Geliştir" };
   if (accuracy !== null && accuracy < 85) return { key: "good", label: "İyi" };
   return { key: "strong", label: "Güçlü" };
+}
+
+function createQuizAttempt(origin: QuizOrigin, quizQuestions: Question[], correct: number, wrong: number, blank: number): QuizAttempt {
+  let label = "Hızlı karışık deneme";
+  if (origin.kind === "mistakes") label = "Yanlışlar tekrarı";
+  else if (origin.kind === "unit") label = `${courses.find((item) => item.code === origin.courseCode)?.short ?? origin.courseCode} · Ünite ${origin.unitNumber}`;
+  else if (origin.kind === "course") label = courses.find((item) => item.code === origin.courseCode)?.title ?? origin.courseCode;
+  else if (origin.kind === "timed") label = origin.courseCode ? `${courses.find((item) => item.code === origin.courseCode)?.short ?? origin.courseCode} süreli deneme` : "5 ders süreli deneme";
+  const net = correct - wrong / 4;
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    date: new Date().toISOString(),
+    label,
+    questionCount: quizQuestions.length,
+    correct,
+    wrong,
+    blank,
+    net: Number(net.toFixed(2)),
+    score: quizQuestions.length ? Math.max(0, Math.round((net / quizQuestions.length) * 100)) : 0,
+    timed: origin.kind === "timed",
+  };
 }
 
 function splitSpeechText(text: string, maxLength = 420) {
@@ -173,6 +227,8 @@ export default function Home() {
           const parsedNotes = parsed.notes && typeof parsed.notes === "object" ? Object.fromEntries(Object.entries(parsed.notes).filter((entry): entry is [string, string] => typeof entry[1] === "string")) : {};
           const parsedQuestionStats = parsed.questionStats && typeof parsed.questionStats === "object" ? parsed.questionStats : {};
           const parsedReviewCardStats = parsed.reviewCardStats && typeof parsed.reviewCardStats === "object" ? parsed.reviewCardStats : {};
+          const parsedQuizHistory = Array.isArray(parsed.quizHistory) ? parsed.quizHistory : [];
+          const parsedActivityDates = Array.isArray(parsed.activityDates) ? parsed.activityDates.filter((date): date is string => typeof date === "string") : [];
           const parsedDailyPlan = parsed.dailyPlan && typeof parsed.dailyPlan === "object" && parsed.dailyPlan.date === localDateKey() ? parsed.dailyPlan : undefined;
           setStore({
             completed: Array.isArray(parsed.completed) ? parsed.completed : [],
@@ -185,6 +241,8 @@ export default function Home() {
             focusSessions: typeof parsed.focusSessions === "number" ? parsed.focusSessions : 0,
             questionStats: parsedQuestionStats,
             reviewCardStats: parsedReviewCardStats,
+            quizHistory: parsedQuizHistory,
+            activityDates: parsedActivityDates,
             dailyPlan: parsedDailyPlan,
           });
           if (parsedDailyPlan) setPlanMinutes(parsedDailyPlan.minutes);
@@ -224,7 +282,7 @@ export default function Home() {
         setFocusRunning(false);
         setFocusEndsAt(null);
         setFocusCompleted(true);
-        setStore((prev) => ({ ...prev, focusMinutes: prev.focusMinutes + focusDuration, focusSessions: prev.focusSessions + 1 }));
+        setStore((prev) => addStudyActivity({ ...prev, focusMinutes: prev.focusMinutes + focusDuration, focusSessions: prev.focusSessions + 1 }));
       }
     };
     syncClock();
@@ -249,7 +307,9 @@ export default function Home() {
             const current = questionStats[question.id] ?? { answered: 0, correct: 0, wrong: 0, blank: 0 };
             questionStats[question.id] = { ...current, blank: current.blank + 1 };
           });
-          return { ...prev, questionStats };
+          const blank = unanswered.length;
+          const attempt = createQuizAttempt(quizOrigin, quiz, quizCorrect, quizWrong, blank);
+          return addStudyActivity({ ...prev, questionStats, quizHistory: [attempt, ...prev.quizHistory].slice(0, 50) });
         });
         setQuizEndsAt(null);
         setShowResult(true);
@@ -258,7 +318,7 @@ export default function Home() {
     syncClock();
     const timer = window.setInterval(syncClock, 250);
     return () => window.clearInterval(timer);
-  }, [quiz, quizEndsAt, quizOrigin.kind, quizPicks, showResult]);
+  }, [quiz, quizCorrect, quizEndsAt, quizOrigin, quizPicks, quizWrong, showResult]);
 
   useEffect(() => () => {
     if (focusMiniWindow && !focusMiniWindow.closed) focusMiniWindow.close();
@@ -431,10 +491,11 @@ export default function Home() {
   }
 
   function toggleUnit(id: string) {
-    setStore((prev) => ({
-      ...prev,
-      completed: prev.completed.includes(id) ? prev.completed.filter((item) => item !== id) : [...prev.completed, id],
-    }));
+    setStore((prev) => {
+      const completing = !prev.completed.includes(id);
+      const next = { ...prev, completed: completing ? [...prev.completed, id] : prev.completed.filter((item) => item !== id) };
+      return completing ? addStudyActivity(next) : next;
+    });
   }
 
   function toggleBookmark(id: string) {
@@ -466,7 +527,12 @@ export default function Home() {
   }
 
   function togglePlanTask(taskId: string) {
-    setStore((prev) => prev.dailyPlan ? ({ ...prev, dailyPlan: { ...prev.dailyPlan, done: prev.dailyPlan.done.includes(taskId) ? prev.dailyPlan.done.filter((id) => id !== taskId) : [...prev.dailyPlan.done, taskId] } }) : prev);
+    setStore((prev) => {
+      if (!prev.dailyPlan) return prev;
+      const completing = !prev.dailyPlan.done.includes(taskId);
+      const next = { ...prev, dailyPlan: { ...prev.dailyPlan, done: completing ? [...prev.dailyPlan.done, taskId] : prev.dailyPlan.done.filter((id) => id !== taskId) } };
+      return completing ? addStudyActivity(next) : next;
+    });
   }
 
   function runPlanTask(task: DailyPlanTask) {
@@ -500,13 +566,13 @@ export default function Home() {
     if (!cardId) return;
     setStore((prev) => {
       const stat = prev.reviewCardStats[cardId] ?? { known: 0, repeat: 0, lastReviewed: "" };
-      return {
+      return addStudyActivity({
         ...prev,
         reviewCardStats: {
           ...prev.reviewCardStats,
           [cardId]: { known: stat.known + (known ? 1 : 0), repeat: stat.repeat + (known ? 0 : 1), lastReviewed: new Date().toISOString() },
         },
-      };
+      });
     });
     if (known) setReviewKnown((value) => value + 1);
     else setReviewRepeat((value) => value + 1);
@@ -740,9 +806,10 @@ export default function Home() {
           const stat = questionStats[question.id] ?? { answered: 0, correct: 0, wrong: 0, blank: 0 };
           questionStats[question.id] = { ...stat, blank: stat.blank + 1 };
         });
-        return { ...prev, questionStats };
+        const attempt = createQuizAttempt(quizOrigin, quiz, quizCorrect, quizWrong, unanswered.length);
+        return addStudyActivity({ ...prev, questionStats, quizHistory: [attempt, ...prev.quizHistory].slice(0, 50) });
       });
-    }
+    } else setStore((prev) => addStudyActivity({ ...prev, quizHistory: [createQuizAttempt(quizOrigin, quiz, quizCorrect, quizWrong, 0), ...prev.quizHistory].slice(0, 50) }));
     setQuizEndsAt(null);
     setShowResult(true);
   }
@@ -766,6 +833,14 @@ export default function Home() {
     const stat = store.reviewCardStats[card.id];
     return stat && stat.known > stat.repeat;
   }).length;
+  const streaks = calculateStreaks(store.activityDates);
+  const streakWeek = Array.from({ length: 7 }, (_, index) => {
+    const offset = index - 6;
+    const key = dateKeyOffset(offset);
+    const label = new Intl.DateTimeFormat("tr-TR", { weekday: "short", timeZone: "Europe/Istanbul" }).format(new Date(`${key}T12:00:00+03:00`)).slice(0, 2);
+    return { key, label, active: store.activityDates.includes(key), today: offset === 0 };
+  });
+  const historyAverage = store.quizHistory.length ? Math.round(store.quizHistory.reduce((sum, attempt) => sum + attempt.score, 0) / store.quizHistory.length) : 0;
   const inStudySection = studySectionViews.includes(view);
   const inExamSection = examSectionViews.includes(view);
   const inProgressSection = progressSectionViews.includes(view);
@@ -800,7 +875,7 @@ export default function Home() {
         </header>
 
         {inStudySection && <nav className="section-tabs" aria-label="Çalışma araçları"><button className={view === "daily-plan" ? "active" : ""} onClick={() => setView("daily-plan")}><span>☷</span> Bugünün Planı</button><button className={view === "focus" ? "active" : ""} onClick={() => setView("focus")}><span>◷</span> Kronometre</button><button className={view === "review" ? "active" : ""} onClick={() => setView("review")}><span>★</span> Tekrar <em>{reviewUnits.length}</em></button><button className={view === "search" ? "active" : ""} onClick={() => setView("search")}><span>⌕</span> İçerikte Ara</button></nav>}
-        {inExamSection && view !== "quiz" && <nav className="section-tabs" aria-label="Deneme araçları"><button className={view === "timed-exam" ? "active" : ""} onClick={() => setView("timed-exam")}><span>⏱</span> Süreli Deneme</button><button onClick={() => startQuiz()}><span>▶</span> Hızlı Deneme</button><button className={view === "mistakes" ? "active" : ""} onClick={() => setView("mistakes")}><span>↺</span> Yanlışlar <em>{store.mistakes.length}</em></button><button className={view === "duel" ? "active" : ""} onClick={() => setView("duel")}><span>⚔</span> Canlı Düello</button></nav>}
+        {inExamSection && view !== "quiz" && <nav className="section-tabs" aria-label="Deneme araçları"><button className={view === "timed-exam" ? "active" : ""} onClick={() => setView("timed-exam")}><span>⏱</span> Süreli Deneme</button><button onClick={() => startQuiz()}><span>▶</span> Hızlı Deneme</button><button className={view === "quiz-history" ? "active" : ""} onClick={() => setView("quiz-history")}><span>◴</span> Geçmiş <em>{store.quizHistory.length}</em></button><button className={view === "mistakes" ? "active" : ""} onClick={() => setView("mistakes")}><span>↺</span> Yanlışlar <em>{store.mistakes.length}</em></button><button className={view === "duel" ? "active" : ""} onClick={() => setView("duel")}><span>⚔</span> Canlı Düello</button></nav>}
         {inProgressSection && <nav className="section-tabs" aria-label="İlerleme araçları"><button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")}><span>▦</span> Ünite Haritası</button><button className={view === "weakness" ? "active" : ""} onClick={() => setView("weakness")}><span>◫</span> Zayıflık Haritası</button><button className={view === "sources" ? "active" : ""} onClick={() => setView("sources")}><span>✓</span> Kaynaklar</button></nav>}
 
         {view === "dashboard" && (
@@ -822,6 +897,8 @@ export default function Home() {
             </section>
 
             {lastUnit && <button className="resume-card" onClick={() => openUnit(lastUnit.course, lastUnit.unit)} style={{ "--course-color": lastUnit.course.color } as React.CSSProperties}><span className="resume-icon">↗</span><span><small>KALDIĞIN YER</small><strong>{lastUnit.course.short} · Ünite {lastUnit.unitNumber}: {lastUnit.unit.title}</strong></span><em>Devam et →</em></button>}
+
+            <section className="streak-card"><div className="streak-flame">♨</div><div className="streak-copy"><span>ÇALIŞMA SERİSİ</span><strong>{streaks.current ? `${streaks.current} günlük seri` : "Seriyi bugün başlat"}</strong><small>En uzun seri: {streaks.longest} gün</small></div><div className="streak-week">{streakWeek.map((day) => <div key={day.key} className={`${day.active ? "active " : ""}${day.today ? "today" : ""}`}><i>{day.active ? "✓" : ""}</i><span>{day.label}</span></div>)}</div></section>
 
             <section className="stat-grid">
               <article><span>Genel ilerleme</span><strong>%{completion}</strong><small>40 ünitenin {store.completed.length} tanesi tamam</small></article>
@@ -936,6 +1013,18 @@ export default function Home() {
               return <article key={course.code} style={{ "--course-color": course.color } as React.CSSProperties}><span>{course.code}</span><h2>{course.title}</h2><p>{count} soru · {duration} dakika</p><button onClick={() => startTimedExam(course.code)}>Ders provasını başlat →</button></article>;
             })}</div>
             <section className="timed-rules"><strong>Deneme kuralları</strong><div><span>01</span><p>Soru paletinden boş veya işaretli sorulara geri dönebilirsin.</p><span>02</span><p>Boş bırakabilirsin; boşlar neti düşürmez.</p><span>03</span><p>Süre dolunca kalan sorular otomatik boş kaydedilir.</p><span>04</span><p>Sonuçlar zayıflık haritasını günceller.</p></div></section>
+          </div>
+        )}
+
+        {view === "quiz-history" && (
+          <div className="page quiz-history-page">
+            <p className="eyebrow">SON 50 DENEME</p>
+            <h1>Deneme Geçmişi</h1>
+            <p className="lead">Tamamladığın denemeleri, netlerini ve puan değişimini cihazında takip et.</p>
+            {store.quizHistory.length ? <>
+              <section className="history-summary"><article><span>Toplam deneme</span><strong>{store.quizHistory.length}</strong><small>tamamlanan kayıt</small></article><article><span>Ortalama puan</span><strong>%{historyAverage}</strong><small>tüm denemeler</small></article><article><span>En iyi puan</span><strong>%{Math.max(...store.quizHistory.map((attempt) => attempt.score))}</strong><small>kişisel rekor</small></article></section>
+              <section className="history-list">{store.quizHistory.map((attempt) => <article key={attempt.id}><div className="history-score"><strong>%{attempt.score}</strong><span>{attempt.net.toFixed(2)} net</span></div><div className="history-copy"><small>{attempt.timed ? "⏱ SÜRELİ" : "DENEME"}</small><strong>{attempt.label}</strong><span>{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(attempt.date))}</span></div><div className="history-results"><span><b>{attempt.correct}</b> doğru</span><span><b>{attempt.wrong}</b> yanlış</span><span><b>{attempt.blank}</b> boş</span><em>{attempt.questionCount} soru</em></div></article>)}</section>
+            </> : <div className="empty-large"><span>◴</span><h2>Henüz kayıtlı deneme yok</h2><p>Bitirdiğin ilk denemenin sonucu otomatik olarak burada görünecek.</p><button className="primary" onClick={() => startQuiz()}>Hızlı deneme başlat</button></div>}
           </div>
         )}
 
@@ -1173,7 +1262,7 @@ export default function Home() {
                 </aside>
               </div>
             </> : <>
-              <section className="result-card"><span className="result-ring">%{estimated}</span><p className="eyebrow">{quizOrigin.kind === "timed" ? "SÜRELİ DENEME TAMAMLANDI" : "DENEME TAMAMLANDI"}</p><h1>{estimated >= 70 ? "Gayet iyi gidiyorsun." : estimated >= 50 ? "Geçiş çizgisine yaklaşıyorsun." : "Yanlışları kapatıp yeniden dene."}</h1><div className="result-stats"><div><strong>{quizCorrect}</strong><span>Doğru</span></div><div><strong>{quizWrong}</strong><span>Yanlış</span></div><div><strong>{quizBlank}</strong><span>Boş</span></div><div><strong>{net.toFixed(2)}</strong><span>Net</span></div></div><p>Bu hesaplama çalışma tahminidir. Gerçek harf notu üniversitenin değerlendirme sistemine göre belirlenir.</p><div className="hero-actions">{quizBlank > 0 && <button className="primary" onClick={() => setShowBlankReview((value) => !value)}>{showBlankReview ? "Boş açıklamalarını kapat" : `Boş soruları gör (${quizBlank})`}</button>}<button className="ghost" onClick={quizOrigin.kind === "unit" ? leaveQuiz : restartQuiz}>{quizOrigin.kind === "unit" ? "Üniteye dön" : "Yeni deneme"}</button><button className="ghost" onClick={() => setView("mistakes")}>Yanlışları gör</button></div></section>
+              <section className="result-card"><span className="result-ring">%{estimated}</span><p className="eyebrow">{quizOrigin.kind === "timed" ? "SÜRELİ DENEME TAMAMLANDI" : "DENEME TAMAMLANDI"}</p><h1>{estimated >= 70 ? "Gayet iyi gidiyorsun." : estimated >= 50 ? "Geçiş çizgisine yaklaşıyorsun." : "Yanlışları kapatıp yeniden dene."}</h1><div className="result-stats"><div><strong>{quizCorrect}</strong><span>Doğru</span></div><div><strong>{quizWrong}</strong><span>Yanlış</span></div><div><strong>{quizBlank}</strong><span>Boş</span></div><div><strong>{net.toFixed(2)}</strong><span>Net</span></div></div><p>Bu hesaplama çalışma tahminidir. Gerçek harf notu üniversitenin değerlendirme sistemine göre belirlenir.</p><div className="hero-actions">{quizBlank > 0 && <button className="primary" onClick={() => setShowBlankReview((value) => !value)}>{showBlankReview ? "Boş açıklamalarını kapat" : `Boş soruları gör (${quizBlank})`}</button>}<button className="ghost" onClick={quizOrigin.kind === "unit" ? leaveQuiz : restartQuiz}>{quizOrigin.kind === "unit" ? "Üniteye dön" : "Yeni deneme"}</button><button className="ghost" onClick={() => setView("mistakes")}>Yanlışları gör</button><button className="ghost" onClick={() => setView("quiz-history")}>Deneme geçmişi</button></div></section>
               {showBlankReview && <section className="blank-review"><header><div><p className="eyebrow">CEVAPLANMAYANLAR</p><h2>Boş bıraktığın sorular</h2></div><span>{quizBlank} soru</span></header><div>{quiz.filter((question) => quizBlankIds.includes(question.id)).map((question, index) => <article key={question.id}><small>{question.course} · Ünite {question.unit} · Boş {index + 1}</small><h3>{question.prompt}</h3><strong>Doğru cevap: {String.fromCharCode(65 + question.answer)} — {question.options[question.answer]}</strong><p>{question.explanation}</p></article>)}</div></section>}
             </>}
           </div>

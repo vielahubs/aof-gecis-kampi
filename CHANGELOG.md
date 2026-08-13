@@ -2,6 +2,20 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.18.0 - 2026-08-13
+
+### Eklendi
+
+- Tamamlanan son 50 denemeyi tarih, deneme türü, doğru, yanlış, boş, net ve puan bilgileriyle saklayan Deneme Geçmişi.
+- Deneme geçmişinde toplam deneme, ortalama puan ve en iyi puan özeti.
+- Ünite tamamlama, deneme çözme, odak oturumu ve tekrar çalışmasını gün bazında izleyen Çalışma Serisi.
+- Ana sayfada son yedi günün çalışma durumunu, güncel seriyi ve en uzun seriyi gösteren haftalık şerit.
+
+### İyileştirildi
+
+- Yeni alanlar mevcut cihaz verilerini silmeden geriye uyumlu olarak yerel kayda eklendi.
+- Deneme sonuç ekranına geçmişe doğrudan geçiş eklendi.
+
 ## v0.17.0 - 2026-08-13
 
 ### Eklendi
