@@ -2,6 +2,22 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.17.0 - 2026-08-13
+
+### Eklendi
+
+- Ünite sayfasından başlatılan tarayıcı tabanlı Türkçe Sesli Çalışma modu.
+- Ünite başlığı, özet, kritik bilgiler, sınav sinyalleri, ayrıntılı anlatım ve hızlı tekrarı sırayla okuma.
+- Sayfalar arasında gezinirken ekranda kalan modern ses oynatıcısı.
+- Duraklatma/devam, önceki ve sonraki anlatım bölümü kontrolleri.
+- 0.8×, 1×, 1.2×, 1.5× ve 1.8× okuma hızı seçenekleri.
+- Uzun anlatımları tarayıcıların güvenle okuyabileceği kısa bölümlere ayırma.
+
+### İyileştirildi
+
+- Ünite yan paneline yeni kategori oluşturmadan “Sesli çalışma” eylemi yerleştirildi.
+- Türkçe bir sistem sesi bulunduğunda otomatik olarak tercih edilmesi sağlandı.
+
 ## v0.16.0 - 2026-08-13
 
 ### Eklendi

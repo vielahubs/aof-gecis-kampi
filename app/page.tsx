@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Course, Question, Unit, courses, questions } from "./study-data";
 import { examGuides, getPatternAnswer } from "./exam-guides";
@@ -99,6 +99,20 @@ function weaknessLevel(accuracy: number | null, activeMistakes: number) {
   return { key: "strong", label: "Güçlü" };
 }
 
+function splitSpeechText(text: string, maxLength = 420) {
+  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((part) => part.trim()).filter(Boolean) ?? [text];
+  const chunks: string[] = [];
+  let current = "";
+  sentences.forEach((sentence) => {
+    if (current && `${current} ${sentence}`.length > maxLength) {
+      chunks.push(current);
+      current = sentence;
+    } else current = current ? `${current} ${sentence}` : sentence;
+  });
+  if (current) chunks.push(current);
+  return chunks;
+}
+
 export default function Home() {
   const [view, setView] = useState<View>("dashboard");
   const [selectedCourse, setSelectedCourse] = useState<Course>(courses[0]);
@@ -138,6 +152,17 @@ export default function Home() {
   const [reviewSessionFinished, setReviewSessionFinished] = useState(false);
   const [reviewKnown, setReviewKnown] = useState(0);
   const [reviewRepeat, setReviewRepeat] = useState(0);
+  const [audioCourse, setAudioCourse] = useState<Course | null>(null);
+  const [audioUnit, setAudioUnit] = useState<Unit | null>(null);
+  const [audioIndex, setAudioIndex] = useState(0);
+  const [audioTotal, setAudioTotal] = useState(0);
+  const [audioStatus, setAudioStatus] = useState<"idle" | "playing" | "paused">("idle");
+  const [audioRate, setAudioRate] = useState(1);
+  const [audioSupported, setAudioSupported] = useState(true);
+  const audioSegmentsRef = useRef<string[]>([]);
+  const audioIndexRef = useRef(0);
+  const audioRateRef = useRef(1);
+  const audioSessionRef = useRef(0);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -239,6 +264,15 @@ export default function Home() {
     if (focusMiniWindow && !focusMiniWindow.closed) focusMiniWindow.close();
   }, [focusMiniWindow]);
 
+  useEffect(() => {
+    const supportCheck = window.setTimeout(() => setAudioSupported("speechSynthesis" in window && "SpeechSynthesisUtterance" in window), 0);
+    return () => {
+      window.clearTimeout(supportCheck);
+      audioSessionRef.current += 1;
+      window.speechSynthesis?.cancel();
+    };
+  }, []);
+
   const totalUnits = courses.reduce((sum, course) => sum + course.units.length, 0);
   const completion = Math.round((store.completed.length / totalUnits) * 100);
   const accuracy = store.answered ? Math.round((store.correct / store.answered) * 100) : 0;
@@ -308,6 +342,92 @@ export default function Home() {
     setSelectedUnit(unit);
     setLastUnitId(unit.id);
     setView("course");
+  }
+
+  function speakAudioSegment(index: number) {
+    if (!("speechSynthesis" in window) || index < 0 || index >= audioSegmentsRef.current.length) {
+      setAudioStatus("idle");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const session = ++audioSessionRef.current;
+    const utterance = new SpeechSynthesisUtterance(audioSegmentsRef.current[index]);
+    utterance.lang = "tr-TR";
+    utterance.rate = audioRateRef.current;
+    const turkishVoice = window.speechSynthesis.getVoices().find((voice) => voice.lang.toLocaleLowerCase("tr-TR").startsWith("tr"));
+    if (turkishVoice) utterance.voice = turkishVoice;
+    utterance.onend = () => {
+      if (audioSessionRef.current !== session) return;
+      const next = index + 1;
+      if (next < audioSegmentsRef.current.length) speakAudioSegment(next);
+      else setAudioStatus("idle");
+    };
+    utterance.onerror = () => {
+      if (audioSessionRef.current === session) setAudioStatus("idle");
+    };
+    audioIndexRef.current = index;
+    setAudioIndex(index);
+    setAudioStatus("playing");
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function startAudioStudy(course: Course, unit: Unit) {
+    if (!("speechSynthesis" in window)) {
+      setAudioSupported(false);
+      return;
+    }
+    const guide = examGuides[unit.id];
+    const deepDive = historyDeepDives[unit.id] ?? [];
+    const rawSegments = [
+      `${course.title}. Ünite ${course.units.indexOf(unit) + 1}. ${unit.title}.`,
+      `Ünite özeti. ${unit.summary}`,
+      `Kritik bilgiler. ${unit.keyPoints.join(". ")}.`,
+      `Soruda görünce tanıman gereken ifadeler. ${guide.signals.join(". ")}.`,
+      ...guide.lesson,
+      ...deepDive.flatMap((section) => [`${section.title}.`, section.body]),
+      `Sık karıştırılan nokta. ${guide.trap}`,
+      `İki dakikalık tekrar. ${guide.hook}`,
+    ];
+    const segments = rawSegments.flatMap((text) => splitSpeechText(text));
+    audioSegmentsRef.current = segments;
+    audioIndexRef.current = 0;
+    setAudioCourse(course);
+    setAudioUnit(unit);
+    setAudioTotal(segments.length);
+    speakAudioSegment(0);
+  }
+
+  function toggleAudioStudy() {
+    if (!("speechSynthesis" in window) || !audioSegmentsRef.current.length) return;
+    if (audioStatus === "playing") {
+      window.speechSynthesis.pause();
+      setAudioStatus("paused");
+    } else if (audioStatus === "paused") {
+      window.speechSynthesis.resume();
+      setAudioStatus("playing");
+    } else speakAudioSegment(audioIndexRef.current >= audioSegmentsRef.current.length - 1 ? 0 : audioIndexRef.current);
+  }
+
+  function skipAudioStudy(direction: -1 | 1) {
+    const next = Math.min(audioSegmentsRef.current.length - 1, Math.max(0, audioIndexRef.current + direction));
+    speakAudioSegment(next);
+  }
+
+  function changeAudioRate(rate: number) {
+    audioRateRef.current = rate;
+    setAudioRate(rate);
+    if (audioStatus !== "idle") speakAudioSegment(audioIndexRef.current);
+  }
+
+  function closeAudioStudy() {
+    audioSessionRef.current += 1;
+    window.speechSynthesis?.cancel();
+    audioSegmentsRef.current = [];
+    setAudioStatus("idle");
+    setAudioCourse(null);
+    setAudioUnit(null);
+    setAudioIndex(0);
+    setAudioTotal(0);
   }
 
   function toggleUnit(id: string) {
@@ -967,7 +1087,7 @@ export default function Home() {
                 </div>
               </>
             ) : (
-              <UnitStudy course={selectedCourse} unit={selectedUnit} completed={store.completed.includes(selectedUnit.id)} bookmarked={store.bookmarks.includes(selectedUnit.id)} note={store.notes[selectedUnit.id] ?? ""} onToggle={() => toggleUnit(selectedUnit.id)} onBookmark={() => toggleBookmark(selectedUnit.id)} onNote={(note) => updateNote(selectedUnit.id, note)} onQuiz={(unitNumber) => startQuiz(selectedCourse.code, false, unitNumber)} onCourseQuiz={() => startQuiz(selectedCourse.code)} onPrevious={selectedCourse.units.indexOf(selectedUnit) > 0 ? () => openUnit(selectedCourse, selectedCourse.units[selectedCourse.units.indexOf(selectedUnit) - 1]) : undefined} onNext={selectedCourse.units.indexOf(selectedUnit) < selectedCourse.units.length - 1 ? () => openUnit(selectedCourse, selectedCourse.units[selectedCourse.units.indexOf(selectedUnit) + 1]) : undefined} />
+              <UnitStudy course={selectedCourse} unit={selectedUnit} completed={store.completed.includes(selectedUnit.id)} bookmarked={store.bookmarks.includes(selectedUnit.id)} note={store.notes[selectedUnit.id] ?? ""} audioActive={audioUnit?.id === selectedUnit.id} audioSupported={audioSupported} onAudio={() => startAudioStudy(selectedCourse, selectedUnit)} onToggle={() => toggleUnit(selectedUnit.id)} onBookmark={() => toggleBookmark(selectedUnit.id)} onNote={(note) => updateNote(selectedUnit.id, note)} onQuiz={(unitNumber) => startQuiz(selectedCourse.code, false, unitNumber)} onCourseQuiz={() => startQuiz(selectedCourse.code)} onPrevious={selectedCourse.units.indexOf(selectedUnit) > 0 ? () => openUnit(selectedCourse, selectedCourse.units[selectedCourse.units.indexOf(selectedUnit) - 1]) : undefined} onNext={selectedCourse.units.indexOf(selectedUnit) < selectedCourse.units.length - 1 ? () => openUnit(selectedCourse, selectedCourse.units[selectedCourse.units.indexOf(selectedUnit) + 1]) : undefined} />
             )}
           </div>
         )}
@@ -1059,6 +1179,13 @@ export default function Home() {
           </div>
         )}
       </section>
+      {audioCourse && audioUnit && <aside className="audio-study-player" style={{ "--course-color": audioCourse.color } as React.CSSProperties}>
+        <div className="audio-study-progress"><i style={{ width: `${audioTotal ? ((audioIndex + (audioStatus === "idle" ? 1 : 0)) / audioTotal) * 100 : 0}%` }} /></div>
+        <div className="audio-study-copy"><span>SESLİ ÇALIŞMA · {audioCourse.short}</span><strong>{audioUnit.title}</strong><small>{audioStatus === "playing" ? "Okunuyor" : audioStatus === "paused" ? "Duraklatıldı" : "Bölüm tamamlandı"} · {audioIndex + 1}/{audioTotal}</small></div>
+        <div className="audio-study-controls"><button onClick={() => skipAudioStudy(-1)} disabled={audioIndex === 0} aria-label="Önceki sesli bölüm">‹</button><button className="audio-play" onClick={toggleAudioStudy} aria-label={audioStatus === "playing" ? "Sesli çalışmayı duraklat" : "Sesli çalışmaya devam et"}>{audioStatus === "playing" ? "Ⅱ" : "▶"}</button><button onClick={() => skipAudioStudy(1)} disabled={audioIndex >= audioTotal - 1} aria-label="Sonraki sesli bölüm">›</button></div>
+        <label>Hız<select value={audioRate} onChange={(event) => changeAudioRate(Number(event.target.value))}><option value={0.8}>0.8×</option><option value={1}>1×</option><option value={1.2}>1.2×</option><option value={1.5}>1.5×</option><option value={1.8}>1.8×</option></select></label>
+        <button className="audio-close" onClick={closeAudioStudy} aria-label="Sesli çalışmayı kapat">×</button>
+      </aside>}
       {focusMiniRoot && createPortal(
         <div className="focus-mini-player">
           <header><span>KRONOMETRE</span><i className={focusRunning ? "running" : ""}>{focusRunning ? "● ÇALIŞIYOR" : focusCompleted ? "✓ TAMAMLANDI" : "DURAKLATILDI"}</i></header>
@@ -1075,7 +1202,7 @@ export default function Home() {
   );
 }
 
-function UnitStudy({ course, unit, completed, bookmarked, note, onToggle, onBookmark, onNote, onQuiz, onCourseQuiz, onPrevious, onNext }: { course: Course; unit: Unit; completed: boolean; bookmarked: boolean; note: string; onToggle: () => void; onBookmark: () => void; onNote: (note: string) => void; onQuiz: (unitNumber: number) => void; onCourseQuiz: () => void; onPrevious?: () => void; onNext?: () => void }) {
+function UnitStudy({ course, unit, completed, bookmarked, note, audioActive, audioSupported, onAudio, onToggle, onBookmark, onNote, onQuiz, onCourseQuiz, onPrevious, onNext }: { course: Course; unit: Unit; completed: boolean; bookmarked: boolean; note: string; audioActive: boolean; audioSupported: boolean; onAudio: () => void; onToggle: () => void; onBookmark: () => void; onNote: (note: string) => void; onQuiz: (unitNumber: number) => void; onCourseQuiz: () => void; onPrevious?: () => void; onNext?: () => void }) {
   const unitNumber = course.units.indexOf(unit) + 1;
   const guide = examGuides[unit.id];
   const deepDive = historyDeepDives[unit.id];
@@ -1100,6 +1227,6 @@ function UnitStudy({ course, unit, completed, bookmarked, note, onToggle, onBook
       <div className="source-note"><strong>10 Ağustos 2026 tarihinde doğrulandı</strong><p>{course.verification} Soru eğilimleri {course.archivePeriods} dönemlerinden çıkarıldı. Açık arşiv resmî değildir; kesin metin ve cevap anahtarı için eKampüs esas alınır.</p><div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}<a href={course.archiveSource} target="_blank" rel="noreferrer">İncelenen soru arşivi ↗</a></div></div>
       <nav className="unit-navigator" aria-label="Üniteler arasında geçiş"><button onClick={onPrevious} disabled={!onPrevious}>← Önceki ünite</button><span>Ünite {unitNumber} / {course.units.length}</span><button onClick={onNext} disabled={!onNext}>Sonraki ünite →</button></nav>
     </article>
-    <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className={bookmarked ? "ghost saved" : "ghost"} onClick={onBookmark}>{bookmarked ? "★ Tekrar listemde" : "☆ Tekrar listeme ekle"}</button><button className="ghost" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Bu üniteden soru çöz" : "Bu dersten soru çöz"}</button><button className="ghost" onClick={onNext} disabled={!onNext}>{onNext ? "Sonraki üniteye geç →" : "Dersin son ünitesi"}</button><small>İpucu: Hızlı özeti kapatıp üç kritik noktayı sesli anlatabiliyorsan üniteyi tamamla.</small></aside>
+    <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className={audioActive ? "ghost audio-active" : "ghost"} onClick={onAudio} disabled={!audioSupported}>{audioSupported ? audioActive ? "◉ Baştan sesli dinle" : "♪ Sesli çalışma" : "Sesli okuma desteklenmiyor"}</button><button className={bookmarked ? "ghost saved" : "ghost"} onClick={onBookmark}>{bookmarked ? "★ Tekrar listemde" : "☆ Tekrar listeme ekle"}</button><button className="ghost" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Bu üniteden soru çöz" : "Bu dersten soru çöz"}</button><button className="ghost" onClick={onNext} disabled={!onNext}>{onNext ? "Sonraki üniteye geç →" : "Dersin son ünitesi"}</button><small>Sesli çalışma; özeti, kritik bilgileri, konu anlatımını ve hızlı tekrarı Türkçe okur.</small></aside>
   </div>;
 }
