@@ -27,7 +27,7 @@ type QuizOrigin =
   | { kind: "timed"; courseCode?: string; duration: number };
 type QuestionStat = { answered: number; correct: number; wrong: number; blank: number };
 type ReviewCardStat = { known: number; repeat: number; lastReviewed: string };
-type SmartReviewCard = { id: string; course: Course; unit: Unit; unitNumber: number; prompt: string; answer: string };
+type SmartReviewCard = { id: string; course: Course; unit: Unit; unitNumber: number; prompt: string; answer: string; priority: number };
 type DailyPlanTask = { id: string; kind: "unit" | "mistakes" | "quiz" | "review"; unitId?: string; minutes: number };
 type DailyPlan = { date: string; minutes: number; tasks: DailyPlanTask[]; done: string[] };
 type QuizAttempt = { id: string; date: string; label: string; questionCount: number; correct: number; wrong: number; blank: number; net: number; score: number; timed: boolean };
@@ -373,6 +373,7 @@ export default function Home() {
     unitNumber: unitIndex + 1,
     prompt,
     answer: getPatternAnswer(unit.id, patternIndex),
+    priority: examGuides[unit.id].patterns.length - patternIndex,
   })))), []);
 
   const unitPerformance = useMemo(() => courses.flatMap((course) => course.units.map((unit, index) => {
@@ -545,15 +546,17 @@ export default function Home() {
   }
 
   function startSmartReview() {
-    const ranked = shuffle(reviewCards).sort((a, b) => {
-      const score = (card: SmartReviewCard) => {
-        const stat = store.reviewCardStats[card.id];
-        const performance = unitPerformance.find(({ unit }) => unit.id === card.unit.id);
-        return Math.max(0, (stat?.repeat ?? 0) - (stat?.known ?? 0)) * 100 + (performance?.activeMistakes ?? 0) * 60 + (store.bookmarks.includes(card.unit.id) ? 35 : 0);
-      };
-      return score(b) - score(a);
-    });
-    setReviewDeck(ranked.slice(0, Math.min(15, ranked.length)).map((card) => card.id));
+    const score = (card: SmartReviewCard) => {
+      const stat = store.reviewCardStats[card.id];
+      const performance = unitPerformance.find(({ unit }) => unit.id === card.unit.id);
+      return Math.max(0, (stat?.repeat ?? 0) - (stat?.known ?? 0)) * 100
+        + (performance?.activeMistakes ?? 0) * 60
+        + (performance?.accuracy === null || performance?.accuracy === undefined ? 0 : 100 - performance.accuracy)
+        + (store.bookmarks.includes(card.unit.id) ? 35 : 0)
+        + card.priority * 12;
+    };
+    const balancedDeck = courses.flatMap((course) => course.units.flatMap((unit) => shuffle(reviewCards.filter((card) => card.course.code === course.code && card.unit.id === unit.id)).sort((a, b) => score(b) - score(a)).slice(0, 1)));
+    setReviewDeck(balancedDeck.map((card) => card.id));
     setReviewCardIndex(0);
     setReviewCardRevealed(false);
     setReviewSessionFinished(false);
@@ -825,14 +828,6 @@ export default function Home() {
   const planProgress = currentPlan?.tasks.length ? Math.round((currentPlan.done.length / currentPlan.tasks.length) * 100) : 0;
   const weakestUnits = [...unitPerformance].filter(({ attempts, activeMistakes }) => attempts > 0 || activeMistakes > 0).sort((a, b) => b.activeMistakes - a.activeMistakes || (a.accuracy ?? 101) - (b.accuracy ?? 101)).slice(0, 5);
   const currentReviewCard = reviewCards.find((card) => card.id === reviewDeck[reviewCardIndex]);
-  const reviewDueCount = reviewCards.filter((card) => {
-    const stat = store.reviewCardStats[card.id];
-    return stat && stat.repeat > stat.known;
-  }).length;
-  const reviewMasteredCount = reviewCards.filter((card) => {
-    const stat = store.reviewCardStats[card.id];
-    return stat && stat.known > stat.repeat;
-  }).length;
   const streaks = calculateStreaks(store.activityDates);
   const streakWeek = Array.from({ length: 7 }, (_, index) => {
     const offset = index - 6;
@@ -1069,12 +1064,12 @@ export default function Home() {
                   <button className="smart-card-flip" onClick={() => setReviewCardRevealed((value) => !value)}>{reviewCardRevealed ? "Soruyu tekrar göster" : "Cevabı göster"} ↻</button>
                 </article>
                 {reviewCardRevealed ? <div className="smart-review-rating"><button className="repeat" onClick={() => rateReviewCard(false)}><span>↺</span><strong>Tekrar et</strong><small>Sonraki oturumda öne çıksın</small></button><button className="known" onClick={() => rateReviewCard(true)}><span>✓</span><strong>Biliyorum</strong><small>Kartı güçlendir</small></button></div> : <p className="smart-review-hint">Kendine dürüst cevap ver; zorlandığın kartlar günlük planında öncelik kazanır.</p>}
-              </> : <div className="smart-review-result"><span>✓</span><p className="eyebrow">OTURUM TAMAMLANDI</p><h2>{reviewKnown} kartı biliyorsun, {reviewRepeat} kart tekrar bekliyor.</h2><div><button className="primary" onClick={startSmartReview}>Yeni 15 kart</button><button className="ghost" onClick={closeSmartReview}>Tekrar merkezine dön</button></div></div>}
+              </> : <div className="smart-review-result"><span>✓</span><p className="eyebrow">OTURUM TAMAMLANDI</p><h2>{reviewKnown} kartı biliyorsun, {reviewRepeat} kart tekrar bekliyor.</h2><div><button className="primary" onClick={startSmartReview}>Yeni 40 kart</button><button className="ghost" onClick={closeSmartReview}>Tekrar merkezine dön</button></div></div>}
             </section> : <>
               <section className="smart-review-launcher">
                 <div className="smart-review-icon">◇</div>
-                <div><span>AKILLI TEKRAR KARTLARI</span><h2>15 kartla hızlı tekrar yap</h2><p>Sınav kalıplarından hazırlanır; yanlışların, yıldızladığın üniteler ve “Tekrar et” dediğin kartlar önce gelir.</p></div>
-                <div className="smart-review-stats"><article><strong>{reviewDueCount}</strong><small>tekrar bekliyor</small></article><article><strong>{reviewMasteredCount}</strong><small>güçlü kart</small></article></div>
+                <div><span>DENGELİ AKILLI TEKRAR</span><h2>40 kartla kapsamlı tekrar yap</h2><p>Her dersin sekiz ünitesinden birer önemli kart seçilir. Yanlışların, düşük doğruluk alanların ve “Tekrar et” dediğin kartlar kendi ünitesi içinde önce gelir.</p></div>
+                <div className="smart-review-stats"><article><strong>{reviewCards.length}</strong><small>kart havuzu</small></article><article><strong>8×5</strong><small>her dersten eşit</small></article></div>
                 <button className="primary" onClick={startSmartReview}>Kartları başlat →</button>
               </section>
               <section className="review-summary">

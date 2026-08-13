@@ -2,6 +2,16 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.19.0 - 2026-08-13
+
+### İyileştirildi
+
+- Akıllı tekrar oturumu 15 karttan 40 karta çıkarıldı.
+- Beş dersin her birinden sekiz kart gelecek biçimde eşit ders dağılımı sağlandı.
+- Her üniteden en az bir sınav kartı seçilerek 40 ünitenin tamamı oturuma dahil edildi.
+- Aynı ünitedeki kartlar; önceki “Tekrar et” seçimleri, aktif yanlışlar, düşük doğruluk ve tekrar listesi dikkate alınarak önceliklendirildi.
+- Tekrar Merkezi’nde 120 kartlık toplam havuz ve 8×5 dengeli dağılım görünür hâle getirildi.
+
 ## v0.18.0 - 2026-08-13
 
 ### Eklendi
