@@ -112,6 +112,10 @@ export default function Home() {
   const [quizCorrect, setQuizCorrect] = useState(0);
   const [quizWrong, setQuizWrong] = useState(0);
   const [quizBlank, setQuizBlank] = useState(0);
+  const [quizPicks, setQuizPicks] = useState<Record<string, number>>({});
+  const [quizFlags, setQuizFlags] = useState<string[]>([]);
+  const [quizBlankIds, setQuizBlankIds] = useState<string[]>([]);
+  const [showBlankReview, setShowBlankReview] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [quizOrigin, setQuizOrigin] = useState<QuizOrigin>({ kind: "mixed" });
   const [quizSeconds, setQuizSeconds] = useState(0);
@@ -211,9 +215,9 @@ export default function Home() {
       setQuizSeconds(remaining);
       if (remaining === 0 && !finished) {
         finished = true;
-        const firstBlank = picked === null ? quizIndex : quizIndex + 1;
-        const unanswered = quiz.slice(firstBlank);
+        const unanswered = quiz.filter((question) => quizPicks[question.id] === undefined);
         setQuizBlank((value) => value + unanswered.length);
+        setQuizBlankIds(unanswered.map((question) => question.id));
         setStore((prev) => {
           const questionStats = { ...prev.questionStats };
           unanswered.forEach((question) => {
@@ -229,7 +233,7 @@ export default function Home() {
     syncClock();
     const timer = window.setInterval(syncClock, 250);
     return () => window.clearInterval(timer);
-  }, [picked, quiz, quizEndsAt, quizIndex, quizOrigin.kind, showResult]);
+  }, [quiz, quizEndsAt, quizOrigin.kind, quizPicks, showResult]);
 
   useEffect(() => () => {
     if (focusMiniWindow && !focusMiniWindow.closed) focusMiniWindow.close();
@@ -491,6 +495,10 @@ export default function Home() {
     setQuizCorrect(0);
     setQuizWrong(0);
     setQuizBlank(0);
+    setQuizPicks({});
+    setQuizFlags([]);
+    setQuizBlankIds([]);
+    setShowBlankReview(false);
     setShowResult(false);
     setQuizSeconds(0);
     setQuizEndsAt(null);
@@ -516,6 +524,10 @@ export default function Home() {
     setQuizCorrect(0);
     setQuizWrong(0);
     setQuizBlank(0);
+    setQuizPicks({});
+    setQuizFlags([]);
+    setQuizBlankIds([]);
+    setShowBlankReview(false);
     setShowResult(false);
     setQuizOrigin({ kind: "timed", courseCode, duration });
     setQuizSeconds(duration * 60);
@@ -556,10 +568,11 @@ export default function Home() {
   }
 
   function answerQuestion(option: number) {
-    if (picked !== null) return;
+    if (picked !== null || quizPicks[quiz[quizIndex].id] !== undefined) return;
     const current = quiz[quizIndex];
     const correct = option === current.answer;
     setPicked(option);
+    setQuizPicks((prev) => ({ ...prev, [current.id]: option }));
     setQuizCorrect((value) => value + (correct ? 1 : 0));
     setQuizWrong((value) => value + (correct ? 0 : 1));
     setStore((prev) => ({
@@ -579,23 +592,39 @@ export default function Home() {
     }));
   }
 
-  function nextQuestion(blank = false) {
-    if (blank && picked === null) {
-      const current = quiz[quizIndex];
-      setQuizBlank((value) => value + 1);
+  function goToQuizQuestion(index: number) {
+    const nextQuestion = quiz[index];
+    if (!nextQuestion) return;
+    setQuizIndex(index);
+    setPicked(quizPicks[nextQuestion.id] ?? null);
+  }
+
+  function nextQuestion() {
+    goToQuizQuestion((quizIndex + 1) % quiz.length);
+  }
+
+  function toggleQuizFlag() {
+    const current = quiz[quizIndex];
+    setQuizFlags((prev) => prev.includes(current.id) ? prev.filter((id) => id !== current.id) : [...prev, current.id]);
+  }
+
+  function finishQuiz() {
+    if (showResult) return;
+    const unanswered = quiz.filter((question) => quizPicks[question.id] === undefined);
+    setQuizBlank(unanswered.length);
+    setQuizBlankIds(unanswered.map((question) => question.id));
+    if (unanswered.length) {
       setStore((prev) => {
-        const stat = prev.questionStats[current.id] ?? { answered: 0, correct: 0, wrong: 0, blank: 0 };
-        return { ...prev, questionStats: { ...prev.questionStats, [current.id]: { ...stat, blank: stat.blank + 1 } } };
+        const questionStats = { ...prev.questionStats };
+        unanswered.forEach((question) => {
+          const stat = questionStats[question.id] ?? { answered: 0, correct: 0, wrong: 0, blank: 0 };
+          questionStats[question.id] = { ...stat, blank: stat.blank + 1 };
+        });
+        return { ...prev, questionStats };
       });
     }
-    if (quizIndex === quiz.length - 1) {
-      setQuizEndsAt(null);
-      setShowResult(true);
-    }
-    else {
-      setQuizIndex((value) => value + 1);
-      setPicked(null);
-    }
+    setQuizEndsAt(null);
+    setShowResult(true);
   }
 
   const currentQuestion = quiz[quizIndex];
@@ -786,7 +815,7 @@ export default function Home() {
               const duration = Math.max(10, Math.ceil(count * 1.5));
               return <article key={course.code} style={{ "--course-color": course.color } as React.CSSProperties}><span>{course.code}</span><h2>{course.title}</h2><p>{count} soru · {duration} dakika</p><button onClick={() => startTimedExam(course.code)}>Ders provasını başlat →</button></article>;
             })}</div>
-            <section className="timed-rules"><strong>Deneme kuralları</strong><div><span>01</span><p>Soruyu yanıtladıktan sonra geri dönüş yoktur.</p><span>02</span><p>Boş bırakabilirsin; boşlar neti düşürmez.</p><span>03</span><p>Süre dolunca kalan sorular otomatik boş kaydedilir.</p><span>04</span><p>Sonuçlar zayıflık haritasını günceller.</p></div></section>
+            <section className="timed-rules"><strong>Deneme kuralları</strong><div><span>01</span><p>Soru paletinden boş veya işaretli sorulara geri dönebilirsin.</p><span>02</span><p>Boş bırakabilirsin; boşlar neti düşürmez.</p><span>03</span><p>Süre dolunca kalan sorular otomatik boş kaydedilir.</p><span>04</span><p>Sonuçlar zayıflık haritasını günceller.</p></div></section>
           </div>
         )}
 
@@ -999,19 +1028,34 @@ export default function Home() {
             {!showResult ? <>
               <div className="quiz-top"><button className="back-link" onClick={leaveQuiz}>× Denemeden çık</button>{quizOrigin.kind === "timed" && <strong className={quizSeconds <= 60 ? "quiz-clock urgent" : "quiz-clock"}>⏱ {timedClock}</strong>}<span>Soru {quizIndex + 1} / {quiz.length}</span></div>
               <div className="quiz-progress"><i style={{ width: `${((quizIndex + 1) / quiz.length) * 100}%` }} /></div>
-              <section className="question-card">
-                <div className="question-meta"><span>{currentQuestion.course}</span><span>Ünite {currentQuestion.unit}</span></div>
-                <h1>{currentQuestion.prompt}</h1>
-                <div className="option-list">
-                  {currentQuestion.options.map((option, index) => {
-                    const state = picked === null ? "" : index === currentQuestion.answer ? "correct" : index === picked ? "wrong" : "muted";
-                    return <button key={option} className={state} onClick={() => answerQuestion(index)}><span>{String.fromCharCode(65 + index)}</span>{option}{state === "correct" && <b>✓</b>}{state === "wrong" && <b>×</b>}</button>;
-                  })}
-                </div>
-                {picked !== null && <div className={picked === currentQuestion.answer ? "feedback correct" : "feedback wrong"}><strong>{picked === currentQuestion.answer ? "Doğru cevap" : `Doğru cevap: ${String.fromCharCode(65 + currentQuestion.answer)}`}</strong><p>{currentQuestion.explanation}</p></div>}
-                <div className="question-actions"><span>{picked === null ? "Bilmiyorsan boş bırak; 4 yanlış 1 doğruyu götürüyor." : "Açıklamayı anladıysan devam et."}</span><button className="primary" onClick={() => nextQuestion(picked === null)}>{picked === null ? "Boş bırak" : quizIndex === quiz.length - 1 ? "Sonucu gör" : "Sonraki soru"} →</button></div>
-              </section>
-            </> : <section className="result-card"><span className="result-ring">%{estimated}</span><p className="eyebrow">{quizOrigin.kind === "timed" ? "SÜRELİ DENEME TAMAMLANDI" : "DENEME TAMAMLANDI"}</p><h1>{estimated >= 70 ? "Gayet iyi gidiyorsun." : estimated >= 50 ? "Geçiş çizgisine yaklaşıyorsun." : "Yanlışları kapatıp yeniden dene."}</h1><div className="result-stats"><div><strong>{quizCorrect}</strong><span>Doğru</span></div><div><strong>{quizWrong}</strong><span>Yanlış</span></div><div><strong>{quizBlank}</strong><span>Boş</span></div><div><strong>{net.toFixed(2)}</strong><span>Net</span></div></div><p>Bu hesaplama çalışma tahminidir. Gerçek harf notu üniversitenin değerlendirme sistemine göre belirlenir.</p><div className="hero-actions"><button className="primary" onClick={quizOrigin.kind === "unit" ? leaveQuiz : restartQuiz}>{quizOrigin.kind === "unit" ? "Üniteye dön" : "Yeni deneme"}</button><button className="ghost" onClick={() => setView("weakness")}>Zayıflık haritası</button><button className="ghost" onClick={() => setView("mistakes")}>Yanlışları gör</button></div></section>}
+              <div className="quiz-workspace">
+                <section className="question-card">
+                  <div className="question-meta"><span>{currentQuestion.course}</span><span>Ünite {currentQuestion.unit}</span><button className={quizFlags.includes(currentQuestion.id) ? "question-flag active" : "question-flag"} onClick={toggleQuizFlag}>{quizFlags.includes(currentQuestion.id) ? "⚑ İşaretlendi" : "⚐ Sonra dön"}</button></div>
+                  <h1>{currentQuestion.prompt}</h1>
+                  <div className="option-list">
+                    {currentQuestion.options.map((option, index) => {
+                      const state = picked === null ? "" : index === currentQuestion.answer ? "correct" : index === picked ? "wrong" : "muted";
+                      return <button key={option} className={state} onClick={() => answerQuestion(index)}><span>{String.fromCharCode(65 + index)}</span>{option}{state === "correct" && <b>✓</b>}{state === "wrong" && <b>×</b>}</button>;
+                    })}
+                  </div>
+                  {picked !== null && <div className={picked === currentQuestion.answer ? "feedback correct" : "feedback wrong"}><strong>{picked === currentQuestion.answer ? "Doğru cevap" : `Doğru cevap: ${String.fromCharCode(65 + currentQuestion.answer)}`}</strong><p>{currentQuestion.explanation}</p></div>}
+                  <div className="question-actions"><span>{picked === null ? "Boş geçebilir veya soruyu işaretleyip sonra dönebilirsin." : "Cevabın kaydedildi; paletten başka soruya dönebilirsin."}</span><button className="primary" onClick={nextQuestion}>{quizIndex === quiz.length - 1 ? "Başa dön" : picked === null ? "Boş geç" : "Sonraki soru"} →</button></div>
+                </section>
+                <aside className="quiz-palette">
+                  <header><div><span>SORU PALETİ</span><strong>{Object.keys(quizPicks).length}/{quiz.length} cevaplandı</strong></div><small>⚑ {quizFlags.length}</small></header>
+                  <div>{quiz.map((question, index) => {
+                    const answered = quizPicks[question.id] !== undefined;
+                    const flagged = quizFlags.includes(question.id);
+                    return <button key={question.id} className={`${index === quizIndex ? "current " : ""}${answered ? "answered " : ""}${flagged ? "flagged" : ""}`} onClick={() => goToQuizQuestion(index)} aria-label={`${index + 1}. soruya git${flagged ? ", işaretli" : ""}`}>{index + 1}{flagged && <i>⚑</i>}</button>;
+                  })}</div>
+                  <ul><li><i className="answered" /> Cevaplandı</li><li><i className="flagged" /> İşaretli</li><li><i /> Boş</li></ul>
+                  <button className="quiz-finish" onClick={finishQuiz}>Denemeyi bitir <span>{quiz.length - Object.keys(quizPicks).length ? `${quiz.length - Object.keys(quizPicks).length} boş` : "Hazır"}</span></button>
+                </aside>
+              </div>
+            </> : <>
+              <section className="result-card"><span className="result-ring">%{estimated}</span><p className="eyebrow">{quizOrigin.kind === "timed" ? "SÜRELİ DENEME TAMAMLANDI" : "DENEME TAMAMLANDI"}</p><h1>{estimated >= 70 ? "Gayet iyi gidiyorsun." : estimated >= 50 ? "Geçiş çizgisine yaklaşıyorsun." : "Yanlışları kapatıp yeniden dene."}</h1><div className="result-stats"><div><strong>{quizCorrect}</strong><span>Doğru</span></div><div><strong>{quizWrong}</strong><span>Yanlış</span></div><div><strong>{quizBlank}</strong><span>Boş</span></div><div><strong>{net.toFixed(2)}</strong><span>Net</span></div></div><p>Bu hesaplama çalışma tahminidir. Gerçek harf notu üniversitenin değerlendirme sistemine göre belirlenir.</p><div className="hero-actions">{quizBlank > 0 && <button className="primary" onClick={() => setShowBlankReview((value) => !value)}>{showBlankReview ? "Boş açıklamalarını kapat" : `Boş soruları gör (${quizBlank})`}</button>}<button className="ghost" onClick={quizOrigin.kind === "unit" ? leaveQuiz : restartQuiz}>{quizOrigin.kind === "unit" ? "Üniteye dön" : "Yeni deneme"}</button><button className="ghost" onClick={() => setView("mistakes")}>Yanlışları gör</button></div></section>
+              {showBlankReview && <section className="blank-review"><header><div><p className="eyebrow">CEVAPLANMAYANLAR</p><h2>Boş bıraktığın sorular</h2></div><span>{quizBlank} soru</span></header><div>{quiz.filter((question) => quizBlankIds.includes(question.id)).map((question, index) => <article key={question.id}><small>{question.course} · Ünite {question.unit} · Boş {index + 1}</small><h3>{question.prompt}</h3><strong>Doğru cevap: {String.fromCharCode(65 + question.answer)} — {question.options[question.answer]}</strong><p>{question.explanation}</p></article>)}</div></section>}
+            </>}
           </div>
         )}
       </section>

@@ -2,6 +2,21 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.16.0 - 2026-08-13
+
+### Eklendi
+
+- Denemelerde cevaplanan, boş ve işaretlenen soruları gösteren soru paleti.
+- Her soruda “Sonra dön” işareti ve paletten istenen soruya geri geçiş.
+- Denemeyi bitirmeden önce kalan boş soru sayısını gösteren sonuçlandırma düğmesi.
+- Sonuç ekranında boş bırakılan soruları doğru seçenekleri ve açıklamalarıyla inceleme alanı.
+
+### Düzeltildi
+
+- Boş bırakılan soruların yalnızca sayı olarak görünmesi ve hangi sorular olduğunun gösterilmemesi düzeltildi.
+- Bir soruya geri dönüldüğünde önceki cevabın kaybolması ve istatistiğin yeniden sayılabilmesi önlendi.
+- Süre dolduğunda tüm cevaplanmamış soruların güvenli biçimde boş kaydedilmesi sağlandı.
+
 ## v0.15.0 - 2026-08-13
 
 ### Eklendi
