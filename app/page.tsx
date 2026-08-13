@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Course, Question, Unit, courses, questions } from "./study-data";
 import { examGuides, getPatternAnswer } from "./exam-guides";
 import { historyDeepDives } from "./history-deep-dives";
@@ -8,6 +9,16 @@ import LiveDuel from "./live-duel";
 
 type View = "dashboard" | "duel" | "search" | "review" | "focus" | "progress" | "course" | "quiz" | "mistakes" | "sources";
 type Theme = "light" | "dark";
+type FocusMiniMode = "picture-in-picture" | "popup";
+type DocumentPictureInPicture = {
+  requestWindow: (options?: { width?: number; height?: number; preferInitialWindowPlacement?: boolean }) => Promise<Window>;
+};
+
+declare global {
+  interface Window {
+    documentPictureInPicture?: DocumentPictureInPicture;
+  }
+}
 type QuizOrigin =
   | { kind: "mixed" }
   | { kind: "course"; courseCode: string }
@@ -26,6 +37,23 @@ type StoredState = {
 
 const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {}, focusMinutes: 0, focusSessions: 0 };
 const lastUnitStorageKey = "aof-gecis-kampi-last-unit";
+const focusMiniStyles = `
+  :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; background: #171a21; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: #171a21; color: #fff; }
+  button { font: inherit; cursor: pointer; }
+  .focus-mini-player { min-height: 100vh; padding: 22px; display: flex; flex-direction: column; justify-content: center; }
+  .focus-mini-player header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .focus-mini-player header span { color: #ff9789; font-size: 10px; font-weight: 900; letter-spacing: .14em; }
+  .focus-mini-player header i { color: #8d94a3; font-size: 10px; font-style: normal; }
+  .focus-mini-player header i.running { color: #8ee2b4; }
+  .focus-mini-player > strong { display: block; margin: 19px 0 5px; font: 900 54px/1 monospace; letter-spacing: -.06em; font-variant-numeric: tabular-nums; }
+  .focus-mini-player > p { min-height: 17px; margin: 0 0 18px; color: #9299a8; font-size: 11px; }
+  .focus-mini-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .focus-mini-controls button { min-height: 43px; border-radius: 11px; border: 1px solid #404653; background: #2d323d; color: #fff; font-size: 11px; font-weight: 900; }
+  .focus-mini-controls button:first-child { border-color: #ff705d; background: #ff705d; }
+  .focus-mini-player > small { margin-top: 13px; color: #676e7c; font-size: 9px; text-align: center; }
+`;
 
 function normalizeSearch(value: string) {
   return value.toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -62,6 +90,10 @@ export default function Home() {
   const [focusSeconds, setFocusSeconds] = useState(25 * 60);
   const [focusRunning, setFocusRunning] = useState(false);
   const [focusCompleted, setFocusCompleted] = useState(false);
+  const [focusEndsAt, setFocusEndsAt] = useState<number | null>(null);
+  const [focusMiniWindow, setFocusMiniWindow] = useState<Window | null>(null);
+  const [focusMiniRoot, setFocusMiniRoot] = useState<HTMLElement | null>(null);
+  const [focusMiniMode, setFocusMiniMode] = useState<FocusMiniMode | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -106,17 +138,27 @@ export default function Home() {
   }, [lastUnitId, ready]);
 
   useEffect(() => {
-    if (!focusRunning) return;
-    const timer = window.setTimeout(() => {
-      if (focusSeconds <= 1) {
-        setFocusSeconds(0);
+    if (!focusRunning || !focusEndsAt) return;
+    let sessionRecorded = false;
+    const syncClock = () => {
+      const remaining = Math.max(0, Math.ceil((focusEndsAt - Date.now()) / 1000));
+      setFocusSeconds(remaining);
+      if (remaining === 0 && !sessionRecorded) {
+        sessionRecorded = true;
         setFocusRunning(false);
+        setFocusEndsAt(null);
         setFocusCompleted(true);
         setStore((prev) => ({ ...prev, focusMinutes: prev.focusMinutes + focusDuration, focusSessions: prev.focusSessions + 1 }));
-      } else setFocusSeconds(focusSeconds - 1);
-    }, 1000);
-    return () => window.clearTimeout(timer);
-  }, [focusDuration, focusRunning, focusSeconds]);
+      }
+    };
+    syncClock();
+    const timer = window.setInterval(syncClock, 250);
+    return () => window.clearInterval(timer);
+  }, [focusDuration, focusEndsAt, focusRunning]);
+
+  useEffect(() => () => {
+    if (focusMiniWindow && !focusMiniWindow.closed) focusMiniWindow.close();
+  }, [focusMiniWindow]);
 
   const totalUnits = courses.reduce((sum, course) => sum + course.units.length, 0);
   const completion = Math.round((store.completed.length / totalUnits) * 100);
@@ -193,18 +235,69 @@ export default function Home() {
     setFocusSeconds(minutes * 60);
     setFocusRunning(false);
     setFocusCompleted(false);
+    setFocusEndsAt(null);
   }
 
   function toggleFocusTimer() {
-    if (focusSeconds === 0) setFocusSeconds(focusDuration * 60);
+    if (focusRunning) {
+      const remaining = focusEndsAt ? Math.max(0, Math.ceil((focusEndsAt - Date.now()) / 1000)) : focusSeconds;
+      setFocusSeconds(remaining);
+      setFocusEndsAt(null);
+      setFocusRunning(false);
+      return;
+    }
+    const remaining = focusSeconds === 0 ? focusDuration * 60 : focusSeconds;
+    setFocusSeconds(remaining);
     setFocusCompleted(false);
-    setFocusRunning((running) => !running);
+    setFocusEndsAt(Date.now() + remaining * 1000);
+    setFocusRunning(true);
   }
 
   function resetFocusTimer() {
     setFocusSeconds(focusDuration * 60);
     setFocusRunning(false);
     setFocusCompleted(false);
+    setFocusEndsAt(null);
+  }
+
+  async function openFocusMiniWindow() {
+    if (focusMiniWindow && !focusMiniWindow.closed) {
+      focusMiniWindow.focus();
+      return;
+    }
+
+    let miniWindow: Window | null = null;
+    let mode: FocusMiniMode = "popup";
+    try {
+      if (window.documentPictureInPicture) {
+        miniWindow = await window.documentPictureInPicture.requestWindow({ width: 360, height: 280, preferInitialWindowPlacement: true });
+        mode = "picture-in-picture";
+      } else {
+        miniWindow = window.open("", "aof-focus-mini", "popup,width=360,height=280");
+      }
+    } catch {
+      miniWindow = window.open("", "aof-focus-mini", "popup,width=360,height=280");
+    }
+
+    if (!miniWindow) return;
+    miniWindow.document.title = "AÖF Odak Sayacı";
+    miniWindow.document.documentElement.lang = "tr";
+    miniWindow.document.body.replaceChildren();
+    miniWindow.document.head.querySelector("style[data-focus-mini]")?.remove();
+    const style = miniWindow.document.createElement("style");
+    style.dataset.focusMini = "true";
+    style.textContent = focusMiniStyles;
+    miniWindow.document.head.append(style);
+    const root = miniWindow.document.createElement("div");
+    miniWindow.document.body.append(root);
+    miniWindow.addEventListener("pagehide", () => {
+      setFocusMiniWindow((current) => current === miniWindow ? null : current);
+      setFocusMiniRoot(null);
+      setFocusMiniMode(null);
+    }, { once: true });
+    setFocusMiniWindow(miniWindow);
+    setFocusMiniRoot(root);
+    setFocusMiniMode(mode);
   }
 
   function startQuiz(courseCode?: string, mistakeOnly = false, unitNumber?: number) {
@@ -330,7 +423,7 @@ export default function Home() {
       <section className="content">
         <header className="topbar">
           <div><span className="status-dot" /> Veriler bu cihazda saklanıyor</div>
-          <div className="top-actions"><button className={focusRunning ? "focus-mini running" : "focus-mini"} onClick={() => setView("focus")}>{focusRunning ? `◉ ${focusClock}` : "◷ Odak"}</button><button className="theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "Açık temaya geç" : "Karanlık temaya geç"}>{theme === "dark" ? "☀ Açık" : "☾ Koyu"}</button><span className="date-pill">22 AĞU</span><button onClick={() => startQuiz()}>Hızlı deneme</button></div>
+          <div className="top-actions"><button className={focusRunning ? "focus-mini running" : "focus-mini"} onClick={openFocusMiniWindow} title="Odak sayacını mini pencerede aç">{focusRunning ? `◉ ${focusClock}` : "◷ Odak"}</button><button className="theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "Açık temaya geç" : "Karanlık temaya geç"}>{theme === "dark" ? "☀ Açık" : "☾ Koyu"}</button><span className="date-pill">22 AĞU</span><button onClick={() => startQuiz()}>Hızlı deneme</button></div>
         </header>
 
         {view === "dashboard" && (
@@ -444,8 +537,8 @@ export default function Home() {
                 <div className="focus-presets" aria-label="Odak süresi seçimi">{[15, 25, 45].map((minutes) => <button key={minutes} className={focusDuration === minutes ? "active" : ""} onClick={() => chooseFocusDuration(minutes)}>{minutes} dk</button>)}</div>
                 <div className="focus-ring" style={{ "--focus-progress": `${focusProgress * 3.6}deg` } as React.CSSProperties}><div><span>{focusRunning ? "ODAKLAN" : focusCompleted ? "TAMAMLANDI" : "HAZIR"}</span><strong>{focusClock}</strong><small>{focusProgress}% tamamlandı</small></div></div>
                 {focusCompleted && <div className="focus-success">✓ Odak oturumu kaydedildi. Kısa bir mola ver.</div>}
-                <div className="focus-actions"><button className="primary" onClick={toggleFocusTimer}>{focusRunning ? "Duraklat" : focusSeconds === focusDuration * 60 ? "Başlat" : focusSeconds === 0 ? "Yeniden başlat" : "Devam et"}</button><button className="ghost" onClick={resetFocusTimer}>Sıfırla</button></div>
-                <p className="focus-hint">Sayaç başka bir sayfaya geçsen bile çalışmaya devam eder. Tamamlanan oturum süreleri otomatik kaydedilir.</p>
+                <div className="focus-actions"><button className="primary" onClick={toggleFocusTimer}>{focusRunning ? "Duraklat" : focusSeconds === focusDuration * 60 ? "Başlat" : focusSeconds === 0 ? "Yeniden başlat" : "Devam et"}</button><button className="ghost" onClick={resetFocusTimer}>Sıfırla</button><button className="ghost focus-float-button" onClick={openFocusMiniWindow}>{focusMiniWindow && !focusMiniWindow.closed ? "Mini pencere açık" : "↗ Mini pencereye aç"}</button></div>
+                <p className="focus-hint">Sayaç başka bir sayfaya geçsen bile çalışmaya devam eder. Mini pencereyi açarsan süreyi diğer sekmelerin ve uygulamaların üstünde görüp doğrudan kontrol edebilirsin.</p>
               </section>
               <aside className="focus-side">
                 <section><p className="eyebrow">ODAK GEÇMİŞİ</p><div className="focus-stats"><article><strong>{store.focusSessions}</strong><span>tamamlanan oturum</span></article><article><strong>{focusTotal}</strong><span>toplam odak süresi</span></article></div></section>
@@ -590,6 +683,16 @@ export default function Home() {
           </div>
         )}
       </section>
+      {focusMiniRoot && createPortal(
+        <div className="focus-mini-player">
+          <header><span>AÖF ODAK SAYACI</span><i className={focusRunning ? "running" : ""}>{focusRunning ? "● ÇALIŞIYOR" : focusCompleted ? "✓ TAMAMLANDI" : "DURAKLATILDI"}</i></header>
+          <strong>{focusClock}</strong>
+          <p>{focusRunning ? "Süre arka planda doğru biçimde ilerliyor." : focusCompleted ? "Oturum kaydedildi. Kısa bir mola verebilirsin." : `${focusDuration} dakikalık odak oturumu.`}</p>
+          <div className="focus-mini-controls"><button onClick={toggleFocusTimer}>{focusRunning ? "Duraklat" : focusSeconds === 0 ? "Yeniden başlat" : "Başlat / devam et"}</button><button onClick={resetFocusTimer}>Sıfırla</button></div>
+          <small>{focusMiniMode === "picture-in-picture" ? "Her zaman üstte kalan mini pencere" : "Tarayıcı küçük pencere modu"}</small>
+        </div>,
+        focusMiniRoot,
+      )}
     </main>
   );
 }
@@ -619,6 +722,6 @@ function UnitStudy({ course, unit, completed, bookmarked, note, onToggle, onBook
       <div className="source-note"><strong>10 Ağustos 2026 tarihinde doğrulandı</strong><p>{course.verification} Soru eğilimleri {course.archivePeriods} dönemlerinden çıkarıldı. Açık arşiv resmî değildir; kesin metin ve cevap anahtarı için eKampüs esas alınır.</p><div className="source-links"><a href={course.source} target="_blank" rel="noreferrer">Resmî ders içeriği ↗</a>{course.bookSource && <a href={course.bookSource} target="_blank" rel="noreferrer">Resmî kitap sayfası ↗</a>}<a href={course.archiveSource} target="_blank" rel="noreferrer">İncelenen soru arşivi ↗</a></div></div>
       <nav className="unit-navigator" aria-label="Üniteler arasında geçiş"><button onClick={onPrevious} disabled={!onPrevious}>← Önceki ünite</button><span>Ünite {unitNumber} / {course.units.length}</span><button onClick={onNext} disabled={!onNext}>Sonraki ünite →</button></nav>
     </article>
-    <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className={bookmarked ? "ghost saved" : "ghost"} onClick={onBookmark}>{bookmarked ? "★ Tekrar listemde" : "☆ Tekrar listeme ekle"}</button><button className="ghost" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Bu üniteden soru çöz" : "Bu dersten soru çöz"}</button><small>İpucu: Hızlı özeti kapatıp üç kritik noktayı sesli anlatabiliyorsan üniteyi tamamla.</small></aside>
+    <aside className="study-side"><span>Ünite durumu</span><strong>{completed ? "Tamamlandı" : "Çalışılıyor"}</strong><div className="mini-progress"><i style={{ width: completed ? "100%" : "35%", background: course.color }} /></div><button className="primary" onClick={onToggle}>{completed ? "Tamamlanmadı işaretle" : "Üniteyi tamamla"}</button><button className={bookmarked ? "ghost saved" : "ghost"} onClick={onBookmark}>{bookmarked ? "★ Tekrar listemde" : "☆ Tekrar listeme ekle"}</button><button className="ghost" onClick={unitQuestionCount ? () => onQuiz(unitNumber) : onCourseQuiz}>{unitQuestionCount ? "Bu üniteden soru çöz" : "Bu dersten soru çöz"}</button><button className="ghost" onClick={onNext} disabled={!onNext}>{onNext ? "Sonraki üniteye geç →" : "Dersin son ünitesi"}</button><small>İpucu: Hızlı özeti kapatıp üç kritik noktayı sesli anlatabiliyorsan üniteyi tamamla.</small></aside>
   </div>;
 }
