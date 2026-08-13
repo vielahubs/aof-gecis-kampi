@@ -2,6 +2,18 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v0.14.0 - 2026-08-13
+
+### Yenilendi
+
+- Ana gezinme Genel Bakış, Çalış, Denemeler ve İlerleme olmak üzere dört başlığa indirildi.
+- Ders listesi ve ikincil araçlar kalabalığı sol menüden kaldırıldı.
+- Kronometre, tekrar panosu ve içerik araması Çalış sayfasının içine yerleştirildi.
+- Hızlı deneme, yanlışlar ve Canlı Düello Denemeler sayfasında bir araya getirildi.
+- Ünite haritası, zayıflık haritası ve kaynak kontrolü İlerleme alanında toplandı.
+- Masaüstü sol menüsü ve mobil üst menü daha modern aktif durumlar, sade boşluklar ve dört seçenekli düzenle yenilendi.
+- Sayfa içi araç geçişleri kaydırılabilir, yapışkan ve mobil uyumlu alt menüye dönüştürüldü.
+
 ## v0.13.0 - 2026-08-13
 
 ### Eklendi

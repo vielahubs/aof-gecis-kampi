@@ -43,6 +43,9 @@ type StoredState = {
 
 const initialStore: StoredState = { completed: [], mistakes: [], answered: 0, correct: 0, bookmarks: [], notes: {}, focusMinutes: 0, focusSessions: 0, questionStats: {} };
 const lastUnitStorageKey = "aof-gecis-kampi-last-unit";
+const studySectionViews: View[] = ["daily-plan", "focus", "review", "search"];
+const examSectionViews: View[] = ["timed-exam", "quiz", "mistakes", "duel"];
+const progressSectionViews: View[] = ["progress", "weakness", "sources"];
 const focusMiniStyles = `
   :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; background: #171a21; }
   * { box-sizing: border-box; }
@@ -535,6 +538,9 @@ export default function Home() {
   const currentPlan = store.dailyPlan?.date === localDateKey() ? store.dailyPlan : undefined;
   const planProgress = currentPlan?.tasks.length ? Math.round((currentPlan.done.length / currentPlan.tasks.length) * 100) : 0;
   const weakestUnits = [...unitPerformance].filter(({ attempts, activeMistakes }) => attempts > 0 || activeMistakes > 0).sort((a, b) => b.activeMistakes - a.activeMistakes || (a.accuracy ?? 101) - (b.accuracy ?? 101)).slice(0, 5);
+  const inStudySection = studySectionViews.includes(view);
+  const inExamSection = examSectionViews.includes(view);
+  const inProgressSection = progressSectionViews.includes(view);
 
   return (
     <main className="app-shell">
@@ -546,35 +552,16 @@ export default function Home() {
 
         <nav className="main-nav" aria-label="Ana menü">
           <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><span>⌂</span> Genel Bakış</button>
-          <button className={view === "daily-plan" ? "active" : ""} onClick={() => setView("daily-plan")}><span>☷</span> Bugünün Planı</button>
-          <button className={view === "weakness" ? "active" : ""} onClick={() => setView("weakness")}><span>◫</span> Zayıflık Haritası</button>
-          <button className={view === "timed-exam" ? "active" : ""} onClick={() => setView("timed-exam")}><span>⏱</span> Süreli Deneme</button>
-          <button className={view === "duel" ? "active" : ""} onClick={() => setView("duel")}><span>⚔</span> Canlı Düello</button>
-          <button className={view === "search" ? "active" : ""} onClick={() => setView("search")}><span>⌕</span> İçerikte Ara</button>
-          <button className={view === "review" ? "active" : ""} onClick={() => setView("review")}><span>★</span> Tekrar Panosu <em>{reviewUnits.length}</em></button>
-          <button className={view === "focus" ? "active" : ""} onClick={() => setView("focus")}><span>◷</span> Kronometre</button>
-          <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")}><span>▦</span> İlerleme Haritası</button>
-          <button className={view === "mistakes" ? "active" : ""} onClick={() => setView("mistakes")}><span>↺</span> Yanlışlarım <em>{store.mistakes.length}</em></button>
-          <button onClick={() => startQuiz()}><span>▶</span> Karışık Deneme</button>
-          <button className={view === "sources" ? "active" : ""} onClick={() => setView("sources")}><span>✓</span> Kaynak Kontrolü</button>
-        </nav>
-
-        <p className="nav-label">Dersler</p>
-        <nav className="course-nav" aria-label="Dersler">
-          {courses.map((course) => {
-            const done = course.units.filter((unit) => store.completed.includes(unit.id)).length;
-            return (
-              <button key={course.code} onClick={() => openCourse(course)} className={view === "course" && selectedCourse.code === course.code ? "active" : ""}>
-                <span className="course-dot" style={{ background: course.color }} />
-                <span><strong>{course.short}</strong><small>{done}/8 ünite</small></span>
-              </button>
-            );
-          })}
+          <button className={inStudySection ? "active" : ""} onClick={() => setView("daily-plan")}><span>☷</span> Çalış</button>
+          <button className={inExamSection ? "active" : ""} onClick={() => setView("timed-exam")}><span>▶</span> Denemeler</button>
+          <button className={inProgressSection ? "active" : ""} onClick={() => setView("progress")}><span>▦</span> İlerleme</button>
         </nav>
 
         <div className="sidebar-note">
-          <span>Resmî kapsam: 1–8</span>
-          <p>2025–2026 yaz okulu kılavuzuna göre her dersin bütün üniteleri sınav kapsamında.</p>
+          <span>SINAVA {daysToExam()} GÜN</span>
+          <strong>%{completion} tamamlandı</strong>
+          <div><i style={{ width: `${completion}%` }} /></div>
+          <p>{store.completed.length}/{totalUnits} ünite · bütün üniteler kapsamda</p>
         </div>
       </aside>
 
@@ -583,6 +570,10 @@ export default function Home() {
           <div><span className="status-dot" /> Veriler bu cihazda saklanıyor</div>
           <div className="top-actions"><button className={focusRunning ? "focus-mini running" : "focus-mini"} onClick={openFocusMiniWindow} title="Kronometreyi mini pencerede aç">{focusRunning ? `◉ ${focusClock}` : "◷ Kronometre"}</button><button className="theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "Açık temaya geç" : "Karanlık temaya geç"}>{theme === "dark" ? "☀ Açık" : "☾ Koyu"}</button><span className="date-pill">22 AĞU</span><button onClick={() => startQuiz()}>Hızlı deneme</button></div>
         </header>
+
+        {inStudySection && <nav className="section-tabs" aria-label="Çalışma araçları"><button className={view === "daily-plan" ? "active" : ""} onClick={() => setView("daily-plan")}><span>☷</span> Bugünün Planı</button><button className={view === "focus" ? "active" : ""} onClick={() => setView("focus")}><span>◷</span> Kronometre</button><button className={view === "review" ? "active" : ""} onClick={() => setView("review")}><span>★</span> Tekrar <em>{reviewUnits.length}</em></button><button className={view === "search" ? "active" : ""} onClick={() => setView("search")}><span>⌕</span> İçerikte Ara</button></nav>}
+        {inExamSection && view !== "quiz" && <nav className="section-tabs" aria-label="Deneme araçları"><button className={view === "timed-exam" ? "active" : ""} onClick={() => setView("timed-exam")}><span>⏱</span> Süreli Deneme</button><button onClick={() => startQuiz()}><span>▶</span> Hızlı Deneme</button><button className={view === "mistakes" ? "active" : ""} onClick={() => setView("mistakes")}><span>↺</span> Yanlışlar <em>{store.mistakes.length}</em></button><button className={view === "duel" ? "active" : ""} onClick={() => setView("duel")}><span>⚔</span> Canlı Düello</button></nav>}
+        {inProgressSection && <nav className="section-tabs" aria-label="İlerleme araçları"><button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")}><span>▦</span> Ünite Haritası</button><button className={view === "weakness" ? "active" : ""} onClick={() => setView("weakness")}><span>◫</span> Zayıflık Haritası</button><button className={view === "sources" ? "active" : ""} onClick={() => setView("sources")}><span>✓</span> Kaynaklar</button></nav>}
 
         {view === "dashboard" && (
           <div className="page dashboard">
