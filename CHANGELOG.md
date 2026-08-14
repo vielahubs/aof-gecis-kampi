@@ -2,6 +2,12 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v1.2.2 - 2026-08-14
+
+### İyileştirildi
+
+- İnkılap Tarihi I, 8. ünitedeki Musul, etabli ve Küçük Ağrı eşleştirmeleri; ilgili ülkeleri, sorunların anlamını ve kısa sonuçlarını açıklayacak biçimde yeniden yazıldı.
+
 ## v1.2.1 - 2026-08-13
 
 ### İyileştirildi

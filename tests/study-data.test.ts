@@ -40,6 +40,13 @@ test("keeps guides, deep dives and review cards complete", () => {
   assert.equal(cardCount, 120);
 });
 
+test("explains the TAR201U unit 8 country matches clearly", () => {
+  const trap = examGuides["TAR201U-8"].trap;
+  assert.match(trap, /Musul sorunu İngiltere ve Irak'la/);
+  assert.match(trap, /Etabli sorunu Yunanistan'la/);
+  assert.match(trap, /Küçük Ağrı sorunu İran'la/);
+});
+
 test("keeps the question bank balanced and valid", () => {
   assert.equal(questions.length, 50);
   assert.equal(new Set(questions.map((question) => question.id)).size, questions.length);

@@ -86,7 +86,7 @@ export const examGuides: Record<string, ExamGuide> = {
     ],
     ["Musul Komisyonu", "etabli/mübadele", "Küçük Ağrı–İran", "Milletler Cemiyeti", "Montrö–Hatay"],
     ["Sorun–ülke eşleştirmesi", "Kuruluş–amaç eşleştirmesi", "Dış politika ilkesini tanıma"],
-    "Musul–İngiltere/Irak, etabli–Yunanistan, Küçük Ağrı–İran eşleşmelerini birbirine karıştırma.",
+    "Musul sorunu İngiltere ve Irak'la ilgilidir: 1926 Ankara Antlaşması'yla Musul Irak'ta kaldı. Etabli sorunu Yunanistan'la ilgilidir: nüfus mübadelesinde İstanbul'da yerleşik sayılacak Rumlar tartışıldı. Küçük Ağrı sorunu İran'la ilgilidir: 1932 sınır düzenlemesiyle Küçük Ağrı Türkiye'ye bırakıldı.",
     "Yurtta sulh dışarıda hukuk: sorunları önce ülke, sonra çözüm belgesiyle eşleştir."
   ),
 
