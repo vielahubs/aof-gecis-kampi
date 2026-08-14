@@ -2,6 +2,12 @@
 
 Projede yayımlanan önemli değişiklikler bu dosyada sürüm sürüm kaydedilir.
 
+## v1.2.3 - 2026-08-14
+
+### İyileştirildi
+
+- “Denemeyi bitir” eylemi soru paletinden ayrılarak sağ sütunda kendi durum kartına taşındı; düğme metni ve cevaplanan/boş soru bilgileri büyütüldü.
+
 ## v1.2.2 - 2026-08-14
 
 ### İyileştirildi
